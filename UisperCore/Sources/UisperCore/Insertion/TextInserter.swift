@@ -75,7 +75,9 @@ public final class TextInserter: TextInserting {
             log.info("AX value unreadable after write, assuming it landed")
             return true
         }
-        guard after != before, after.contains(text) else {
+        // Value changed, so the write landed. Not comparing against `text`: apps that normalize
+        // input (smart quotes, autocorrect) would fail that check and get a second paste.
+        guard after != before else {
             log.info("AX write not verified, falling back to paste")
             return false
         }
