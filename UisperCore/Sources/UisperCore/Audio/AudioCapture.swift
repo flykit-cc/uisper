@@ -14,7 +14,8 @@ public final class AudioCapture {
 
     public init() {}
 
-    public func start(targetFormat: AVAudioFormat?) throws -> AsyncStream<AVAudioPCMBuffer> {
+    /// `sending`: the buffers are not Sendable, so the caller takes sole ownership of the stream.
+    public func start(targetFormat: AVAudioFormat?) throws -> sending AsyncStream<AVAudioPCMBuffer> {
         stop()
         let input = engine.inputNode
         let micFormat = input.outputFormat(forBus: 0)
