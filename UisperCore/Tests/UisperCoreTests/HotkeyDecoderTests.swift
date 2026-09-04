@@ -56,4 +56,27 @@ struct HotkeyDecoderTests {
         let up = d.handle(type: .flagsChanged, keyCode: 63, flags: [])
         #expect(up.event == .released)
     }
+
+    @Test func cancelSurvivesSpaceAutorepeat() {
+        var d = HotkeyDecoder(choice: .optionSpace)
+        _ = d.handle(type: .keyDown, keyCode: space, flags: .maskAlternate)
+        let cancel = d.handle(type: .keyDown, keyCode: escape, flags: [])
+        #expect(cancel.event == .cancelled && cancel.swallow)
+        let repeatDown = d.handle(type: .keyDown, keyCode: space, flags: .maskAlternate)
+        #expect(repeatDown.event == nil && repeatDown.swallow)      // autorepeat must not restart
+        let up = d.handle(type: .keyUp, keyCode: space, flags: .maskAlternate)
+        #expect(up.event == nil && up.swallow)                      // orphan keyUp swallowed
+        let fresh = d.handle(type: .keyDown, keyCode: space, flags: .maskAlternate)
+        #expect(fresh.event == .pressed && fresh.swallow)           // next press works again
+    }
+
+    @Test func releasingOptionAfterCancelClearsLatch() {
+        var d = HotkeyDecoder(choice: .optionSpace)
+        _ = d.handle(type: .keyDown, keyCode: space, flags: .maskAlternate)
+        _ = d.handle(type: .keyDown, keyCode: escape, flags: [])
+        let optionUp = d.handle(type: .flagsChanged, keyCode: 58, flags: [])
+        #expect(optionUp.event == nil && !optionUp.swallow)          // no stray .released
+        let fresh = d.handle(type: .keyDown, keyCode: space, flags: .maskAlternate)
+        #expect(fresh.event == .pressed)                             // latch cleared
+    }
 }
