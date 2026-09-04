@@ -34,9 +34,7 @@ public struct HotkeyDecoder: Sendable {
                 guard isDown else { return (nil, false) }
                 isDown = false
                 return (.released, true)
-            case .flagsChanged where !flags.contains(.maskAlternate):
-                cancelled = false
-                guard isDown else { return (nil, false) }
+            case .flagsChanged where isDown && !flags.contains(.maskAlternate):
                 isDown = false
                 return (.released, false)
             default:

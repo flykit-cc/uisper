@@ -70,13 +70,17 @@ struct HotkeyDecoderTests {
         #expect(fresh.event == .pressed && fresh.swallow)           // next press works again
     }
 
-    @Test func releasingOptionAfterCancelClearsLatch() {
+    @Test func releasingOptionAfterCancelKeepsLatch() {
         var d = HotkeyDecoder(choice: .optionSpace)
         _ = d.handle(type: .keyDown, keyCode: space, flags: .maskAlternate)
         _ = d.handle(type: .keyDown, keyCode: escape, flags: [])
         let optionUp = d.handle(type: .flagsChanged, keyCode: 58, flags: [])
-        #expect(optionUp.event == nil && !optionUp.swallow)          // no stray .released
+        #expect(optionUp.event == nil)                               // no stray .released
+        let repeatDown = d.handle(type: .keyDown, keyCode: space, flags: .maskAlternate)
+        #expect(repeatDown.event == nil && repeatDown.swallow)       // latch survives Option up
+        let up = d.handle(type: .keyUp, keyCode: space, flags: .maskAlternate)
+        #expect(up.event == nil && up.swallow)                       // Space keyUp clears it
         let fresh = d.handle(type: .keyDown, keyCode: space, flags: .maskAlternate)
-        #expect(fresh.event == .pressed)                             // latch cleared
+        #expect(fresh.event == .pressed)                             // next press works again
     }
 }
