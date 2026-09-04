@@ -1,0 +1,36 @@
+name: Uisper
+options:
+  bundleIdPrefix: cc.flykit
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "Natively Dev"
+    DEVELOPMENT_TEAM: ""
+    ENABLE_HARDENED_RUNTIME: "NO"
+    ENABLE_APP_SANDBOX: "NO"
+packages:
+  UisperCore:
+    path: UisperCore
+targets:
+  Uisper:
+    type: application
+    platform: macOS
+    sources:
+      - path: Uisper
+        excludes: ["Info.plist"]
+    dependencies:
+      - package: UisperCore
+    entitlements:
+      path: Uisper/Uisper.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cc.flykit.uisper
+        PRODUCT_NAME: uisper
+        GENERATE_INFOPLIST_FILE: "NO"
+        INFOPLIST_FILE: Uisper/Info.plist
