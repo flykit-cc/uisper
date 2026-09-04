@@ -35,7 +35,9 @@ public final class FoundationModelsCleaner: TranscriptCleaner {
         for chunk in CleanupPrompt.chunks(trimmed) {
             let session = LanguageModelSession(model: .default, instructions: CleanupPrompt.instructions)
             let prompt = CleanupPrompt.userPrompt(raw: chunk, locale: locale, vocabulary: vocabulary, context: context)
-            let response = try await session.respond(to: prompt, generating: CleanedTranscript.self)
+            let response = try await session.respond(
+                to: prompt, generating: CleanedTranscript.self,
+                options: GenerationOptions(sampling: .greedy))
             let piece = response.content.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !piece.isEmpty { pieces.append(piece) }
         }
