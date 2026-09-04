@@ -28,7 +28,9 @@ public enum CleanupPrompt {
     }
 
     /// Splits at sentence ends so each chunk is at most `maxCharacters`. A single oversized sentence is split at the last space.
-    public static func chunks(_ text: String, maxCharacters: Int = 8000) -> [String] {
+    /// Budget: the 4096-token window holds instructions + prompt + output, and cleanup output is about the size of its
+    /// input, so a chunk may use at most a quarter of the window. 3000 characters stays inside that even in German.
+    public static func chunks(_ text: String, maxCharacters: Int = 3000) -> [String] {
         guard text.count > maxCharacters else { return [text] }
         var out: [String] = []
         var current = ""

@@ -36,7 +36,8 @@ public final class FoundationModelsCleaner: TranscriptCleaner {
             let session = LanguageModelSession(model: .default, instructions: CleanupPrompt.instructions)
             let prompt = CleanupPrompt.userPrompt(raw: chunk, locale: locale, vocabulary: vocabulary, context: context)
             let response = try await session.respond(to: prompt, generating: CleanedTranscript.self)
-            pieces.append(response.content.text.trimmingCharacters(in: .whitespacesAndNewlines))
+            let piece = response.content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !piece.isEmpty { pieces.append(piece) }
         }
         let out = pieces.joined(separator: " ")
         log.debug("cleaned \(trimmed.count) → \(out.count) chars")
