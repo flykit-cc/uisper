@@ -130,10 +130,13 @@ public final class DictationSession {
         state = .polishing(text: accumulator.full)
         let locale = settings.locale
         let words = vocabulary.words
-        let context = contextProvider()
         let cleanupOn = settings.cleanupEnabled
         Task { [weak self] in
             guard let self else { return }
+            // Read inside the task, not above: `finishListening` runs inside the CGEvent tap
+            // callback, and `contextProvider` makes Accessibility calls that can block on a
+            // wedged app. A slow tap callback gets the tap disabled by the system.
+            let context = contextProvider()
             do {
                 let raw = try await engineTask.value
                 self.engineTask = nil

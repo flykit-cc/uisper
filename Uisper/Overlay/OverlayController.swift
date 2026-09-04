@@ -20,8 +20,10 @@ final class OverlayController {
             _ = session.state
         } onChange: { [weak self] in
             Task { @MainActor in
-                self?.apply()
+                // Re-register first: tracking is one-shot, so a change between `apply` and
+                // `observe` would otherwise be lost and leave the pill stale.
                 self?.observe()
+                self?.apply()
             }
         }
     }
