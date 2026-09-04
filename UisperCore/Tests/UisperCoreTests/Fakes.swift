@@ -40,13 +40,12 @@ final class FakeCleaner: TranscriptCleaner, @unchecked Sendable {
     }
 }
 
-// TODO(Task 8): uncomment once `TextInserting` and `InsertionResult` exist.
-// @MainActor
-// final class FakeInserter: TextInserting {
-//     var inserted: [String] = []
-//     var result: InsertionResult = .inserted
-//     func insert(_ text: String) async -> InsertionResult {
-//         inserted.append(text)
-//         return result
-//     }
-// }
+@MainActor
+final class FakeInserter: TextInserting {
+    var inserted: [String] = []
+    var result: InsertionResult = .inserted
+    func insert(_ text: String) async -> InsertionResult {
+        inserted.append(text)
+        return result
+    }
+}
