@@ -57,17 +57,35 @@ public final class TextInserter: TextInserting {
               let focused else { return false }
         // swiftlint:disable:next force_cast
         let element = focused as! AXUIElement
+
+        // Read before writing. Without a baseline a lying app is indistinguishable from a real
+        // write, so leave the field untouched and let paste do it. Nothing was written here,
+        // so the paste cannot duplicate anything.
+        guard let before = axValue(of: element) else {
+            log.info("AX value not readable, using paste")
+            return false
+        }
         guard AXUIElementSetAttributeValue(element, kAXSelectedTextAttribute as CFString, text as CFTypeRef) == .success else {
             return false
         }
-        // Chrome and Electron report success without writing. Verify.
-        var value: AnyObject?
-        guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value) == .success,
-              let current = value as? String, current.contains(text) else {
+        // Chrome and Electron report success without writing. Verify by diffing the value.
+        guard let after = axValue(of: element) else {
+            // The pre-read worked, so this element does expose a value. Losing it only now
+            // suggests the write landed and moved focus. Claiming success avoids a double paste.
+            log.info("AX value unreadable after write, assuming it landed")
+            return true
+        }
+        guard after != before, after.contains(text) else {
             log.info("AX write not verified, falling back to paste")
             return false
         }
         return true
+    }
+
+    private func axValue(of element: AXUIElement) -> String? {
+        var value: AnyObject?
+        guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value) == .success else { return nil }
+        return value as? String
     }
 
     // MARK: - Paste
@@ -82,11 +100,13 @@ public final class TextInserter: TextInserting {
         let pb = NSPasteboard.general
         let snapshot = PasteboardSnapshot.take(pb)
         copy(text)
+        let ourChangeCount = pb.changeCount
         guard postCommandV() else {
             return .copiedOnly(reason: "Could not send ⌘V. Text copied to the clipboard.")
         }
         try? await Task.sleep(for: .milliseconds(200))
-        snapshot.restore(to: pb)
+        // A different count means the user copied something while we waited. Their clipboard wins.
+        if pb.changeCount == ourChangeCount { snapshot.restore(to: pb) }
         return .pasted
     }
 
