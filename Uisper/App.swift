@@ -3,12 +3,24 @@ import UisperCore
 
 @main
 struct UisperApp: App {
+    @State private var model = AppModel()
+
     var body: some Scene {
-        MenuBarExtra("uisper", systemImage: "mic") {
-            Text("uisper \(UisperCore.version)")
-            Divider()
-            Button("Quit") { NSApplication.shared.terminate(nil) }
-                .keyboardShortcut("q")
+        MenuBarExtra {
+            MenuBarView(model: model)
+        } label: {
+            MenuBarLabel(model: model, systemImage: menuIcon)
+        }
+        Settings {
+            SettingsView(model: model)
+        }
+    }
+
+    private var menuIcon: String {
+        switch model.session.state {
+        case .listening: return "mic.fill"
+        case .polishing: return "sparkles"
+        default: return "mic"
         }
     }
 }

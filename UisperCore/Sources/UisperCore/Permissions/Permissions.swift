@@ -41,7 +41,9 @@ public enum Permissions {
         switch p {
         case .microphone:
             let ok = await AVCaptureDevice.requestAccess(for: .audio)
-            if ok { SFSpeechRecognizer.requestAuthorization { _ in } }   // on-device; prompt once so it never blocks later
+            // @Sendable severs the inherited @MainActor isolation: TCC calls this handler on a
+            // background XPC queue, and without it the isolation check traps (SIGTRAP) at launch.
+            if ok { SFSpeechRecognizer.requestAuthorization { @Sendable _ in } }   // on-device; prompt once so it never blocks later
             return ok
         case .accessibility:
             // Literal value of `kAXTrustedCheckOptionPrompt`: the SDK imports that constant
