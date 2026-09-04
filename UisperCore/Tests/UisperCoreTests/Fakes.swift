@@ -28,18 +28,17 @@ final class FakeSpeechEngine: SpeechEngine, @unchecked Sendable {
     }
 }
 
-// TODO(Task 6): uncomment once `TranscriptCleaner` and `AppContext` exist.
-// final class FakeCleaner: TranscriptCleaner, @unchecked Sendable {
-//     var transform: @Sendable (String) -> String = { "CLEAN(" + $0 + ")" }
-//     var error: Error?
-//     var calls: [(raw: String, vocabulary: [String])] = []
-//
-//     func clean(_ raw: String, locale: Locale, vocabulary: [String], context: AppContext?) async throws -> String {
-//         calls.append((raw, vocabulary))
-//         if let error { throw error }
-//         return transform(raw)
-//     }
-// }
+final class FakeCleaner: TranscriptCleaner, @unchecked Sendable {
+    var transform: @Sendable (String) -> String = { "CLEAN(" + $0 + ")" }
+    var error: Error?
+    var calls: [(raw: String, vocabulary: [String])] = []
+
+    func clean(_ raw: String, locale: Locale, vocabulary: [String], context: AppContext?) async throws -> String {
+        calls.append((raw, vocabulary))
+        if let error { throw error }
+        return transform(raw)
+    }
+}
 
 // TODO(Task 8): uncomment once `TextInserting` and `InsertionResult` exist.
 // @MainActor
