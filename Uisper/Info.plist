@@ -5,7 +5,7 @@
     <key>CFBundleName</key><string>uisper</string>
     <key>CFBundleDisplayName</key><string>uisper</string>
     <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-    <key>CFBundleShortVersionString</key><string>0.1.0</string>
+    <key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key><string>1</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>

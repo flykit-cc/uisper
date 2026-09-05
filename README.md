@@ -37,6 +37,12 @@ Everything runs on Apple silicon inside macOS 26:
 - Password fields are respected: when secure input is on, the text goes to the clipboard instead.
 - Escape cancels. A tap shorter than 300 ms does nothing.
 
+## Download
+
+Grab the latest `uisper-x.y.z.zip` from [Releases](https://github.com/flykit-cc/uisper/releases), unzip, and move `uisper.app` to Applications.
+
+The build is not notarized, so the first launch needs **right-click > Open**, then Open again in the dialog. After that it opens normally. Or build it yourself, see below.
+
 ## Requirements
 
 - macOS 26 or newer, Apple silicon.
