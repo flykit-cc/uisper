@@ -66,7 +66,7 @@ struct LevelMeter: View {
 
     private var normalized: CGFloat {
         let db = 20 * log10(max(Double(level), 1e-5))          // -100 … 0
-        return CGFloat(min(1, max(0, (db + 50) / 42)))          // -50 dB → 0, -8 dB → 1
+        return CGFloat(min(1, max(0, (db + 58) / 34)))          // -58 dB → 0, -24 dB → 1
     }
 
     var body: some View {
@@ -74,10 +74,10 @@ struct LevelMeter: View {
             ForEach(0..<5, id: \.self) { i in
                 Capsule()
                     .fill(.primary)
-                    .frame(width: 3, height: 4 + normalized * Self.weights[i] * 18)
+                    .frame(width: 3, height: 3 + normalized * Self.weights[i] * 24)
             }
         }
-        .frame(width: 28, height: 22)
-        .animation(.easeOut(duration: 0.08), value: normalized)
+        .frame(width: 28, height: 28)
+        .animation(.easeOut(duration: 0.06), value: normalized)
     }
 }

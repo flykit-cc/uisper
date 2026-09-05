@@ -48,6 +48,28 @@ public final class TextInserter: TextInserting {
         return AppContext(bundleID: app.bundleIdentifier, appName: app.localizedName, windowTitle: title)
     }
 
+    /// Frame of the frontmost app's focused window in AppKit screen coordinates (origin bottom-left), or nil.
+    public func focusedWindowFrame() -> CGRect? {
+        guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        var window: AnyObject?
+        guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &window) == .success,
+              let window else { return nil }
+        // swiftlint:disable:next force_cast
+        let w = window as! AXUIElement
+        var posValue: AnyObject?, sizeValue: AnyObject?
+        guard AXUIElementCopyAttributeValue(w, kAXPositionAttribute as CFString, &posValue) == .success,
+              AXUIElementCopyAttributeValue(w, kAXSizeAttribute as CFString, &sizeValue) == .success,
+              let posValue, let sizeValue else { return nil }
+        var origin = CGPoint.zero, size = CGSize.zero
+        // swiftlint:disable:next force_cast
+        guard AXValueGetValue(posValue as! AXValue, .cgPoint, &origin),
+              AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) else { return nil }
+        // AX uses top-left origin of the primary display; AppKit uses bottom-left.
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        return CGRect(x: origin.x, y: primaryHeight - origin.y - size.height, width: size.width, height: size.height)
+    }
+
     // MARK: - Accessibility
 
     private func insertViaAccessibility(_ text: String) -> Bool {

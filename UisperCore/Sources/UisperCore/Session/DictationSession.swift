@@ -149,7 +149,8 @@ public final class DictationSession {
                     catch { log.error("cleanup failed, inserting raw: \(error.localizedDescription, privacy: .public)") }
                     if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { text = raw }
                 }
-                let result = await inserter.insert(text)
+                // Trailing space: dictation usually ends in punctuation, and the next words continue after a space.
+                let result = await inserter.insert(text.trimmingCharacters(in: .whitespacesAndNewlines) + " ")
                 state = .inserted(result: result)
                 scheduleIdle(after: { if case .copiedOnly = result { return .seconds(2) } else { return .milliseconds(400) } }())
             } catch is CancellationError {

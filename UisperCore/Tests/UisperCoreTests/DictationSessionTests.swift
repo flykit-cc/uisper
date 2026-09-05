@@ -62,7 +62,7 @@ struct DictationSessionTests {
         #expect(engine.startedLocales.first?.identifier == "de-DE")
         #expect(cleaner.calls.first?.raw == "hello world")
         #expect(cleaner.calls.first?.vocabulary == ["Zephyr"])
-        #expect(inserter.inserted == ["CLEAN(hello world)"])
+        #expect(inserter.inserted == ["CLEAN(hello world) "])
         #expect(await waitUntil { s.state == .idle })
     }
 
@@ -73,7 +73,7 @@ struct DictationSessionTests {
         s.handle(.released)
         #expect(await waitUntil { !inserter.inserted.isEmpty })
         #expect(cleaner.calls.isEmpty)
-        #expect(inserter.inserted == ["hello world"])
+        #expect(inserter.inserted == ["hello world "])
     }
 
     @Test func quickTapIsCancelled() async {
@@ -113,7 +113,7 @@ struct DictationSessionTests {
         try? await Task.sleep(for: .milliseconds(350))
         s.handle(.released)
         #expect(await waitUntil { !inserter.inserted.isEmpty })
-        #expect(inserter.inserted == ["hello world"])
+        #expect(inserter.inserted == ["hello world "])
     }
 
     @Test func toggleModeStartsAndStopsOnPress() async {

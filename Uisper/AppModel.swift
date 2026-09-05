@@ -43,7 +43,7 @@ final class AppModel {
         self.inserter = inserter
         self.session = session
         self.cleanupNotice = notice
-        self.overlay = OverlayController(session: session)
+        self.overlay = OverlayController(session: session, anchor: { inserter.focusedWindowFrame() })
         startHotkey()
         let granted = Permissions.allGranted
         log.info("launch: permissions granted=\(granted, privacy: .public)")

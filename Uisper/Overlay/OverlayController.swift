@@ -8,8 +8,12 @@ final class OverlayController {
     private let panel: OverlayPanel
     private let session: DictationSession
 
-    init(session: DictationSession) {
+    private let anchor: () -> CGRect?
+
+    /// `anchor` returns the frame of the window being typed in; the pill sits at its bottom edge.
+    init(session: DictationSession, anchor: @escaping () -> CGRect? = { nil }) {
         self.session = session
+        self.anchor = anchor
         self.panel = OverlayPanel(content: PillView(session: session))
         observe()
     }
