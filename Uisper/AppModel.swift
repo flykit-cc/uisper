@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import Observation
 import ServiceManagement
 import UisperCore
@@ -80,13 +81,9 @@ final class AppModel {
         hotkey?.hotkey = settings.hotkey
     }
 
-    /// While the recorder field is capturing, the tap must not fire dictation.
-    func setHotkeyRecording(_ on: Bool, apply: @escaping (Hotkey) -> Void) {
-        if on {
-            hotkey?.recordingSink = { @MainActor code, flags in apply(Hotkey(keyCode: code, flags: flags)) }
-        } else {
-            hotkey?.recordingSink = nil
-        }
+    /// While the recorder field is capturing, the tap routes keys to it instead of dictation.
+    func setHotkeyRecording(_ sink: (@MainActor (CGEventType, Int64, CGEventFlags) -> Bool)?) {
+        hotkey?.recordingSink = sink
     }
 
     func setLaunchAtLogin(_ on: Bool) {

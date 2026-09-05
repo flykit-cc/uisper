@@ -8,10 +8,7 @@ struct GeneralTab: View {
         Form {
             LabeledContent("Hotkey") {
                 VStack(alignment: .leading, spacing: 4) {
-                    HotkeyRecorderView(
-                        hotkey: Bindable(model.settings).hotkey,
-                        onRecordingChanged: model.setHotkeyRecording
-                    )
+                    HotkeyRecorderView(hotkey: Bindable(model.settings).hotkey, model: model)
                     Text("Click the field, then press your shortcut. Esc cancels, ⌫ resets to ⌥ Space.")
                         .font(.caption).foregroundStyle(.secondary)
                 }

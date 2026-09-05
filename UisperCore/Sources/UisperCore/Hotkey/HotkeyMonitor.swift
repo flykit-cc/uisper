@@ -18,7 +18,7 @@ public final class HotkeyMonitor {
     private var source: CFRunLoopSource?
     /// While set, the decoder is bypassed (no dictation) and every key press, including
     /// F14/F15 brightness events, is reported here and swallowed. Used by the recorder field.
-    public var recordingSink: (@MainActor (_ keyCode: Int64, _ flags: CGEventFlags) -> Void)?
+    public var recordingSink: (@MainActor (_ type: CGEventType, _ keyCode: Int64, _ flags: CGEventFlags) -> Bool)?
     private let log = Logger(subsystem: "cc.flykit.uisper", category: "hotkey")
 
     public init(hotkey: Hotkey, onEvent: @escaping @MainActor (HotkeyEvent) -> Void) {
@@ -85,19 +85,23 @@ public final class HotkeyMonitor {
 
     /// Returns true when the event must be swallowed (not forwarded to the focused app).
     private func handle(type: CGEventType, event: CGEvent) -> Bool {
-        if type == Self.systemDefined {
-            guard let ns = NSEvent(cgEvent: event),
-                  let key = Self.brightnessKey(subtype: Int(ns.subtype.rawValue), data1: ns.data1) else { return false }
-            let result = decoder.handle(type: key.isDown ? .keyDown : .keyUp, keyCode: key.keyCode, flags: event.flags)
-            if let e = result.event { onEvent(e) }
-            return result.swallow
-        }
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             log.warning("event tap re-enabled after \(type.rawValue)")
             return false
         }
-        let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+        var type = type
+        var keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+        if type == Self.systemDefined {
+            guard let ns = NSEvent(cgEvent: event),
+                  let key = Self.brightnessKey(subtype: Int(ns.subtype.rawValue), data1: ns.data1) else { return false }
+            type = key.isDown ? .keyDown : .keyUp
+            keyCode = key.keyCode
+        }
+        if let recordingSink {
+            // Recorder field is open: keys go to it instead of the decoder; no dictation.
+            return recordingSink(type, keyCode, event.flags.intersection(Hotkey.modifierMask))
+        }
         let result = decoder.handle(type: type, keyCode: keyCode, flags: event.flags)
         if let e = result.event { onEvent(e) }
         return result.swallow
