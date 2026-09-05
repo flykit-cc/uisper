@@ -10,11 +10,16 @@ struct PillView: View {
             content
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 18)
         .padding(.vertical, 12)
         .frame(width: 440, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.08)))
+        .font(.system(size: 14, weight: .medium, design: .rounded))
+        .glassEffect(.regular, in: Capsule())
+        .overlay(Capsule().strokeBorder(
+            LinearGradient(colors: [.white.opacity(0.45), .white.opacity(0.05)], startPoint: .top, endPoint: .bottom),
+            lineWidth: 0.8))
+        .shadow(color: .black.opacity(0.18), radius: 14, y: 6)
+        .padding(24)   // room for the shadow inside the borderless panel
         .animation(.easeOut(duration: 0.15), value: session.state)
     }
 
@@ -73,7 +78,7 @@ struct LevelMeter: View {
         HStack(spacing: 3) {
             ForEach(0..<5, id: \.self) { i in
                 Capsule()
-                    .fill(.primary)
+                    .fill(Color.accentColor.gradient)
                     .frame(width: 3, height: 3 + normalized * Self.weights[i] * 24)
             }
         }

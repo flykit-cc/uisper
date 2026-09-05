@@ -20,7 +20,9 @@ final class OverlayPanel: NSPanel {
         isMovableByWindowBackground = false
         animationBehavior = .utilityWindow
         // Hosting *controller*: the panel resizes to the pill, so 3 lines of text never clip.
-        contentViewController = NSHostingController(rootView: content)
+        let host = NSHostingController(rootView: content)
+        contentViewController = host
+        setContentSize(host.view.fittingSize)   // capsule + shadow, never clipped
     }
 
     override var canBecomeKey: Bool { false }

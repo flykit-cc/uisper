@@ -46,7 +46,7 @@ final class OverlayController {
             if let win = anchor(), let screen = NSScreen.screens.first(where: { $0.frame.intersects(win) }) {
                 // Bottom-centre of the window being typed in, kept on screen.
                 let v = screen.visibleFrame
-                origin = NSPoint(x: win.midX - size.width / 2, y: win.minY + 16)
+                origin = NSPoint(x: win.midX - size.width / 2, y: win.minY - 8)
                 origin.x = min(max(origin.x, v.minX + 8), v.maxX - size.width - 8)
                 origin.y = min(max(origin.y, v.minY + 8), v.maxY - size.height - 8)
             } else {
