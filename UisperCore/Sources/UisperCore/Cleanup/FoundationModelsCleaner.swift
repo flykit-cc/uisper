@@ -9,10 +9,26 @@ struct CleanedTranscript {
 }
 
 /// Cleans transcripts with Apple's on-device language model.
-public final class FoundationModelsCleaner: TranscriptCleaner {
+public actor FoundationModelsCleaner: TranscriptCleaner {
     private let log = Logger(subsystem: "cc.flykit.uisper", category: "cleanup")
 
-    public init() {}
+    /// One session is kept warm so the next call does not pay the model start-up. It is replaced
+    /// after every use because a session accumulates its transcript and would eventually overflow.
+    private var session: LanguageModelSession
+
+    public init() {
+        session = Self.makeSession()
+        warm()
+    }
+
+    private static func makeSession() -> LanguageModelSession {
+        LanguageModelSession(model: .default, instructions: CleanupPrompt.instructions)
+    }
+
+    private func warm() {
+        guard Self.availabilityMessage == nil else { return }
+        session.prewarm()
+    }
 
     /// nil when the model is usable; otherwise a one-line reason for the UI.
     public static var availabilityMessage: String? {
@@ -33,7 +49,10 @@ public final class FoundationModelsCleaner: TranscriptCleaner {
         guard !trimmed.isEmpty else { return "" }
         var pieces: [String] = []
         for chunk in CleanupPrompt.chunks(trimmed) {
-            let session = LanguageModelSession(model: .default, instructions: CleanupPrompt.instructions)
+            let session = self.session
+            self.session = Self.makeSession()
+            warm()
+            let started = ContinuousClock.now
             let prompt = CleanupPrompt.userPrompt(raw: chunk, locale: locale, vocabulary: vocabulary, context: context)
             let response = try await session.respond(
                 to: prompt, generating: CleanedTranscript.self,
