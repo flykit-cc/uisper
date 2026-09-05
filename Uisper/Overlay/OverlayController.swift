@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import UisperCore
 
-/// Shows the pill while the session is not idle, positioned bottom-centre of the screen with the mouse.
+/// Shows the pill while the session is not idle, at the bottom of the window being typed in (or the screen).
 @MainActor
 final class OverlayController {
     private let panel: OverlayPanel
@@ -40,14 +40,20 @@ final class OverlayController {
 
     func show() {
         if !panel.isVisible {
-            let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
-            guard let screen else { return }
             panel.layoutIfNeeded()
             let size = panel.frame.size
-            let origin = NSPoint(
-                x: screen.visibleFrame.midX - size.width / 2,
-                y: screen.visibleFrame.minY + 96
-            )
+            var origin: NSPoint
+            if let win = anchor(), let screen = NSScreen.screens.first(where: { $0.frame.intersects(win) }) {
+                // Bottom-centre of the window being typed in, kept on screen.
+                let v = screen.visibleFrame
+                origin = NSPoint(x: win.midX - size.width / 2, y: win.minY + 16)
+                origin.x = min(max(origin.x, v.minX + 8), v.maxX - size.width - 8)
+                origin.y = min(max(origin.y, v.minY + 8), v.maxY - size.height - 8)
+            } else {
+                let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
+                guard let screen else { return }
+                origin = NSPoint(x: screen.visibleFrame.midX - size.width / 2, y: screen.visibleFrame.minY + 96)
+            }
             panel.setFrameOrigin(origin)
             panel.alphaValue = 0
             panel.orderFrontRegardless()
