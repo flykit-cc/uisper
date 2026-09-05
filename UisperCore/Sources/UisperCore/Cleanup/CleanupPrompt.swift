@@ -14,12 +14,10 @@ public enum CleanupPrompt {
     - Output only the cleaned text.
 
     Examples:
-    Transcript: so um i think we should uh ship it monday no wait tuesday
-    Output: I think we should ship it Tuesday.
-    Transcript: the text, correction or fixing the text, the text correction is actually working
-    Output: The text correction is actually working.
-    Transcript: there is a few changes you do and so it didn't correct me
-    Output: There are a few changes to make, and so it did not correct me.
+    Transcript: so um we could uh meet at nine no wait at ten
+    Output: We could meet at ten.
+    Transcript: the report, sending or finishing the report, the report is nearly done
+    Output: The report is nearly done.
     """
 
     public static func userPrompt(raw: String, locale: Locale, vocabulary: [String], context: AppContext?) -> String {

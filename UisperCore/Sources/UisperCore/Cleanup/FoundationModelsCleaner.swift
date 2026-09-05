@@ -17,8 +17,9 @@ public actor FoundationModelsCleaner: TranscriptCleaner {
     private var session: LanguageModelSession
 
     public init() {
-        session = Self.makeSession()
-        warm()
+        let s = Self.makeSession()
+        if Self.availabilityMessage == nil { s.prewarm() }
+        session = s
     }
 
     private static func makeSession() -> LanguageModelSession {
