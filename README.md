@@ -4,7 +4,7 @@ Native, fully local dictation for macOS. Hold a key, speak, let go. Clean text l
 
 Nothing leaves your Mac. No accounts, no cloud, no telemetry.
 
-![Live transcription pill](docs/screenshots/pill.png)
+<p align="center"><img src="docs/screenshots/pill.png" alt="Live transcription pill" width="600"></p>
 
 ## How it works
 
@@ -22,11 +22,11 @@ Everything runs on Apple silicon inside macOS 26:
 | Text insertion | Accessibility API, with a paste fallback for Chrome and Electron apps |
 | Hotkey | A global event tap, so hold-to-talk works everywhere |
 
-## Screenshots
+<p align="center"><img src="docs/screenshots/menu.png" alt="Menu bar menu" width="220"></p>
+<p align="center">Everything lives in the menu bar: language, cleanup toggle, hold or toggle mode.</p>
 
-| Menu bar | Settings |
-|---|---|
-| ![Menu](docs/screenshots/menu.png) | ![Settings](docs/screenshots/settings.png) |
+<p align="center"><img src="docs/screenshots/settings.png" alt="Settings" width="560"></p>
+<p align="center">Click the hotkey field and press any shortcut. That is your key from then on.</p>
 
 ## Features
 
