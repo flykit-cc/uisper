@@ -3,23 +3,32 @@ import Testing
 @testable import UisperCore
 
 struct CleanupPromptTests {
-    @Test func promptIncludesLanguageVocabularyAndText() {
-        let p = CleanupPrompt.userPrompt(
-            raw: "hello uh world",
+    @Test func instructionsIncludeLanguageVocabularyAndApp() {
+        let p = CleanupPrompt.instructions(
             locale: Locale(identifier: "de-DE"),
             vocabulary: ["Zephyr", "FlyKit"],
             context: AppContext(bundleID: "com.apple.mail", appName: "Mail", windowTitle: nil)
         )
         #expect(p.contains("German"))
         #expect(p.contains("Zephyr, FlyKit"))
-        #expect(p.contains("Mail"))
-        #expect(p.hasSuffix("hello uh world"))
+        #expect(p.contains("typing in Mail"))
+        #expect(!p.contains("on screen"))
     }
 
-    @Test func promptOmitsEmptyVocabularyAndContext() {
-        let p = CleanupPrompt.userPrompt(raw: "x", locale: Locale(identifier: "en-US"), vocabulary: [], context: nil)
-        #expect(!p.contains("Vocabulary"))
+    @Test func instructionsOmitEmptyVocabularyAndContext() {
+        let p = CleanupPrompt.instructions(locale: Locale(identifier: "en-US"), vocabulary: [], context: nil)
+        #expect(!p.contains("Spell these names"))
         #expect(!p.contains("typing in"))
+    }
+
+    @Test func instructionsQuoteScreenTextAsReference() {
+        let p = CleanupPrompt.instructions(
+            locale: Locale(identifier: "en-US"),
+            vocabulary: [],
+            context: AppContext(bundleID: "x", appName: "Slack", windowTitle: nil, surroundingText: "Hey Zephyr,")
+        )
+        #expect(p.contains("Never output it"))
+        #expect(p.contains("\"\"\"\nHey Zephyr,\n\"\"\""))
     }
 
     @Test func shortTextIsOneChunk() {

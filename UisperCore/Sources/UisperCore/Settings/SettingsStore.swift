@@ -3,6 +3,8 @@ import Observation
 
 public enum EngineID: String, Codable, CaseIterable, Sendable { case apple, whisper }
 public enum ActivationMode: String, Codable, CaseIterable, Sendable { case hold, toggle }
+/// `builtIn` is the model shipped inside the app (MLX). `apple` is Apple Intelligence.
+public enum CleanupEngine: String, Codable, CaseIterable, Sendable { case builtIn, apple }
 
 /// User preferences, backed by UserDefaults. Observable so SwiftUI updates.
 @MainActor
@@ -17,6 +19,7 @@ public final class SettingsStore {
     public var hotkey: Hotkey { didSet { defaults.set(try? JSONEncoder().encode(hotkey), forKey: "hotkey") } }
     public var engine: EngineID { didSet { defaults.set(engine.rawValue, forKey: "engine") } }
     public var cleanupEnabled: Bool { didSet { defaults.set(cleanupEnabled, forKey: "cleanupEnabled") } }
+    public var cleanupEngine: CleanupEngine { didSet { defaults.set(cleanupEngine.rawValue, forKey: "cleanupEngine") } }
     public var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: "launchAtLogin") } }
 
     public var languages: [String] { Self.supportedLanguages }
@@ -34,6 +37,7 @@ public final class SettingsStore {
         }
         engine = EngineID(rawValue: defaults.string(forKey: "engine") ?? "") ?? .apple
         cleanupEnabled = defaults.object(forKey: "cleanupEnabled") as? Bool ?? true
+        cleanupEngine = CleanupEngine(rawValue: defaults.string(forKey: "cleanupEngine") ?? "") ?? .builtIn
         launchAtLogin = defaults.bool(forKey: "launchAtLogin")
     }
 

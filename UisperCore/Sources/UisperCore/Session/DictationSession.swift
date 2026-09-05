@@ -136,7 +136,8 @@ public final class DictationSession {
             // Read inside the task, not above: `finishListening` runs inside the CGEvent tap
             // callback, and `contextProvider` makes Accessibility calls that can block on a
             // wedged app. A slow tap callback gets the tap disabled by the system.
-            let context = contextProvider()
+            // Only the cleaner uses the context, so with cleanup off nothing on screen is read.
+            let context = cleanupOn ? contextProvider() : nil
             do {
                 let raw = try await engineTask.value
                 self.engineTask = nil

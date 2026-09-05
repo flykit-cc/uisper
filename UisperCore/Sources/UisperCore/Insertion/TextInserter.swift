@@ -31,23 +31,6 @@ public final class TextInserter: TextInserting {
         return await paste(text)
     }
 
-    /// Frontmost app and its focused window title, for the cleaner's tone hint.
-    public func focusedContext() -> AppContext? {
-        guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
-        var title: String?
-        let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        var window: AnyObject?
-        if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &window) == .success,
-           let window {
-            var t: AnyObject?
-            // swiftlint:disable:next force_cast
-            if AXUIElementCopyAttributeValue(window as! AXUIElement, kAXTitleAttribute as CFString, &t) == .success {
-                title = t as? String
-            }
-        }
-        return AppContext(bundleID: app.bundleIdentifier, appName: app.localizedName, windowTitle: title)
-    }
-
     /// Frame of the frontmost app's focused window in AppKit screen coordinates (origin bottom-left), or nil.
     public func focusedWindowFrame() -> CGRect? {
         guard let app = NSWorkspace.shared.frontmostApplication else { return nil }

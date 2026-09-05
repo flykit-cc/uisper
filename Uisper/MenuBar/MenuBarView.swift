@@ -15,6 +15,7 @@ struct MenuBarView: View {
             ForEach(model.settings.languages, id: \.self) { Text(displayName($0)).tag($0) }
         }
         Toggle("Clean up with AI", isOn: Bindable(model.settings).cleanupEnabled)
+            .onChange(of: model.settings.cleanupEnabled) { model.ensureModel() }
         Picker("Mode", selection: Bindable(model.settings).mode) {
             Text("Hold to talk").tag(ActivationMode.hold)
             Text("Press to toggle").tag(ActivationMode.toggle)

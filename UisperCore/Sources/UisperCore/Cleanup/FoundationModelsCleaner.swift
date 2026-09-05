@@ -12,23 +12,12 @@ struct CleanedTranscript {
 public actor FoundationModelsCleaner: TranscriptCleaner {
     private let log = Logger(subsystem: "cc.flykit.uisper", category: "cleanup")
 
-    /// One session is kept warm so the next call does not pay the model start-up. It is replaced
-    /// after every use because a session accumulates its transcript and would eventually overflow.
-    private var session: LanguageModelSession
-
     public init() {
-        let s = Self.makeSession()
-        if Self.availabilityMessage == nil { s.prewarm() }
-        session = s
+        if Self.availabilityMessage == nil { Self.makeSession().prewarm() }
     }
 
-    private static func makeSession() -> LanguageModelSession {
-        LanguageModelSession(model: .default, instructions: CleanupPrompt.instructions)
-    }
-
-    private func warm() {
-        guard Self.availabilityMessage == nil else { return }
-        session.prewarm()
+    private static func makeSession(instructions: String = "") -> LanguageModelSession {
+        LanguageModelSession(model: .default, instructions: instructions)
     }
 
     /// nil when the model is usable; otherwise a one-line reason for the UI.
@@ -49,14 +38,12 @@ public actor FoundationModelsCleaner: TranscriptCleaner {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
         var pieces: [String] = []
+        let instructions = CleanupPrompt.instructions(locale: locale, vocabulary: vocabulary, context: context)
         for chunk in CleanupPrompt.chunks(trimmed) {
-            let session = self.session
-            self.session = Self.makeSession()
-            warm()
-            let started = ContinuousClock.now
-            let prompt = CleanupPrompt.userPrompt(raw: chunk, locale: locale, vocabulary: vocabulary, context: context)
+            // A fresh session per chunk: a session accumulates its transcript and would eventually overflow.
+            let session = Self.makeSession(instructions: instructions)
             let response = try await session.respond(
-                to: prompt, generating: CleanedTranscript.self,
+                to: chunk, generating: CleanedTranscript.self,
                 options: GenerationOptions(sampling: .greedy))
             let piece = response.content.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !piece.isEmpty { pieces.append(piece) }

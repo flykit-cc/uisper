@@ -13,7 +13,24 @@ final class AppModel {
     let vocabulary: VocabularyStore
     let session: DictationSession
     private(set) var hotkeyError: String?
-    private(set) var cleanupNotice: String?
+    let modelDownload: ModelDownload
+    /// Why the Apple engine cannot run, or nil when it can.
+    private let appleNotice: String?
+    private var mlx: MLXCleaner?
+
+    /// One line for the Settings pane about the chosen engine, or nil when it is ready.
+    var cleanupNotice: String? {
+        switch settings.cleanupEngine {
+        case .apple: return appleNotice
+        case .builtIn:
+            switch modelDownload.state {
+            case .ready: return nil
+            case .missing: return "The built-in model (\(ModelDownload.sizeLabel)) is not downloaded yet."
+            case .downloading(let f): return "Downloading the built-in model (\(ModelDownload.sizeLabel))… \(Int(f * 100))%. Text is inserted without cleanup until it is done."
+            case .failed(let e): return "Model download failed: \(e)"
+            }
+        }
+    }
 
     private let inserter: TextInserter
     private let overlay: OverlayController
@@ -25,25 +42,31 @@ final class AppModel {
         let vocabulary = VocabularyStore(fileURL: VocabularyStore.defaultURL())
         let inserter = TextInserter()
         let engine = AppleSpeechEngine(contextualStrings: { MainActor.assumeIsolated { vocabulary.words } })
-        let cleaner: TranscriptCleaner
-        var notice: String?
+        let modelDownload = ModelDownload()
+        var engines: [CleanupEngine: TranscriptCleaner] = [:]
+        let mlx = MLXCleaner(directory: modelDownload.directory)
+        engines[.builtIn] = mlx
+        var appleNotice: String?
         if let msg = FoundationModelsCleaner.availabilityMessage {
-            cleaner = PassthroughCleaner()
-            notice = msg + " Text will be inserted without cleanup."
+            appleNotice = msg + " Text will be inserted without cleanup."
         } else {
-            cleaner = FoundationModelsCleaner()
+            engines[.apple] = FoundationModelsCleaner()
         }
+        let cleaner = CleanupRouter(settings: settings, engines: engines)
         let session = DictationSession(
             engine: engine, cleaner: cleaner, inserter: inserter, audio: AudioCapture(),
             settings: settings, vocabulary: vocabulary,
-            contextProvider: { inserter.focusedContext() }
+            contextProvider: { WindowContextReader().read() }
         )
         self.settings = settings
         self.vocabulary = vocabulary
         self.inserter = inserter
         self.session = session
-        self.cleanupNotice = notice
+        self.appleNotice = appleNotice
+        self.modelDownload = modelDownload
+        self.mlx = mlx
         self.overlay = OverlayController(session: session, anchor: { inserter.focusedWindowFrame() })
+        ensureModel()
         startHotkey()
         let granted = Permissions.allGranted
         log.info("launch: permissions granted=\(granted, privacy: .public)")
@@ -75,6 +98,15 @@ final class AppModel {
             hotkey = nil
             hotkeyError = error.localizedDescription
             log.error("hotkey: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Downloads and warms the built-in model when it is the chosen engine. Cheap to call often.
+    func ensureModel() {
+        guard settings.cleanupEnabled, settings.cleanupEngine == .builtIn, let mlx else { return }
+        Task {
+            do { try await modelDownload.ensure() } catch { return }
+            await mlx.prewarm()
         }
     }
 

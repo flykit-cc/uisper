@@ -23,7 +23,8 @@ struct DictationSessionTests {
     private func makeSession(
         script: [TranscriptUpdate] = [TranscriptUpdate(text: "hello wor", isFinal: false), TranscriptUpdate(text: "hello world", isFinal: true)],
         cleanup: Bool = true,
-        mode: ActivationMode = .hold
+        mode: ActivationMode = .hold,
+        contextProvider: @escaping @MainActor () -> AppContext? = { nil }
     ) -> (DictationSession, FakeSpeechEngine, FakeCleaner, FakeInserter, FakeAudio, SettingsStore) {
         let d = UserDefaults(suiteName: "uisper-session-\(UUID().uuidString)")!
         let settings = SettingsStore(defaults: d)
@@ -36,7 +37,7 @@ struct DictationSessionTests {
         let cleaner = FakeCleaner()
         let inserter = FakeInserter()
         let audio = FakeAudio()
-        let session = DictationSession(engine: engine, cleaner: cleaner, inserter: inserter, audio: audio, settings: settings, vocabulary: vocab)
+        let session = DictationSession(engine: engine, cleaner: cleaner, inserter: inserter, audio: audio, settings: settings, vocabulary: vocab, contextProvider: contextProvider)
         return (session, engine, cleaner, inserter, audio, settings)
     }
 
@@ -66,14 +67,16 @@ struct DictationSessionTests {
         #expect(await waitUntil { s.state == .idle })
     }
 
-    @Test func cleanupOffInsertsRaw() async {
-        let (s, _, cleaner, inserter, _, _) = makeSession(cleanup: false)
+    @Test func cleanupOffInsertsRawAndReadsNoScreenText() async {
+        var contextReads = 0
+        let (s, _, cleaner, inserter, _, _) = makeSession(cleanup: false, contextProvider: { contextReads += 1; return nil })
         s.handle(.pressed)
         try? await Task.sleep(for: .milliseconds(350))
         s.handle(.released)
         #expect(await waitUntil { !inserter.inserted.isEmpty })
         #expect(cleaner.calls.isEmpty)
         #expect(inserter.inserted == ["hello world "])
+        #expect(contextReads == 0)
     }
 
     @Test func quickTapIsCancelled() async {
