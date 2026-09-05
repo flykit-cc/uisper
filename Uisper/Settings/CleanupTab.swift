@@ -23,9 +23,11 @@ struct CleanupTab: View {
                     }
                 }
             }
-            Section("Vocabulary") {
+            Section {
                 HStack {
-                    TextField("Add a word or name", text: $newWord).onSubmit(add)
+                    TextField("Add a word or name", text: $newWord)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit(add)
                     Button("Add", action: add).disabled(newWord.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 List(model.vocabulary.words, id: \.self) { word in
@@ -38,6 +40,10 @@ struct CleanupTab: View {
                     }
                 }
                 .frame(minHeight: 140)
+            } header: {
+                Text("Vocabulary")
+            } footer: {
+                Text("Type only the correct spelling, for example \"Claude Code\". Words that sound like it are written this way.")
             }
         }
         .formStyle(.grouped)

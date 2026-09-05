@@ -4,6 +4,9 @@ import UisperCore
 
 struct PermissionsTab: View {
     @State private var status: [Permission: Bool] = [:]
+    // Stored once: a publisher created inside `body` is replaced on every render and never fires.
+    private let ticker = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
+    private let becameActive = NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
 
     var body: some View {
         Form {
@@ -27,7 +30,8 @@ struct PermissionsTab: View {
         }
         .formStyle(.grouped)
         .onAppear(perform: refresh)
-        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in refresh() }
+        .onReceive(ticker) { _ in refresh() }
+        .onReceive(becameActive) { _ in refresh() }   // the user comes back from System Settings
     }
 
     private func refresh() {
