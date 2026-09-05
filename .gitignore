@@ -4,3 +4,4 @@ build/
 xcuserdata/
 .swiftpm/
 UisperCore/.build/
+.metadata_never_index
