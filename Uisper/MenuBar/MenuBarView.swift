@@ -9,6 +9,8 @@ struct MenuBarView: View {
         Text("uisper · \(shortLanguage(model.settings.languageID)) · \(model.settings.hotkey.displayString)")
         if let err = model.hotkeyError { Text(err).foregroundStyle(.red) }
         Divider()
+        Button("Settings…") { openSettings() }.keyboardShortcut(",")
+        Divider()
         Picker("Language", selection: Bindable(model.settings).languageID) {
             ForEach(model.settings.languages, id: \.self) { Text(displayName($0)).tag($0) }
         }
@@ -18,7 +20,6 @@ struct MenuBarView: View {
             Text("Press to toggle").tag(ActivationMode.toggle)
         }
         Divider()
-        Button("Settings…") { openSettings() }.keyboardShortcut(",")
         Button("Quit uisper") { NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
     }
 
