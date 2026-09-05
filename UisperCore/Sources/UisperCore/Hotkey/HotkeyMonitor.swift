@@ -10,16 +10,17 @@ public enum HotkeyError: Error, LocalizedError {
 /// Session-level CGEvent tap that feeds a HotkeyDecoder and reports hotkey events on the main actor.
 @MainActor
 public final class HotkeyMonitor {
-    public var choice: HotkeyChoice { didSet { decoder = HotkeyDecoder(choice: choice) } }
+    public var hotkey: Hotkey { didSet { decoder = HotkeyDecoder(hotkey: hotkey) } }
     private var decoder: HotkeyDecoder
     private let onEvent: @MainActor (HotkeyEvent) -> Void
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
+    private var suspended = false
     private let log = Logger(subsystem: "cc.flykit.uisper", category: "hotkey")
 
-    public init(choice: HotkeyChoice, onEvent: @escaping @MainActor (HotkeyEvent) -> Void) {
-        self.choice = choice
-        self.decoder = HotkeyDecoder(choice: choice)
+    public init(hotkey: Hotkey, onEvent: @escaping @MainActor (HotkeyEvent) -> Void) {
+        self.hotkey = hotkey
+        self.decoder = HotkeyDecoder(hotkey: hotkey)
         self.onEvent = onEvent
     }
 
@@ -63,9 +64,23 @@ public final class HotkeyMonitor {
         source = nil
     }
 
+    /// Stops delivering events without tearing the tap down, so the recorder field in
+    /// Settings can capture the current hotkey instead of starting dictation.
+    public func suspend() {
+        suspended = true
+        if let tap { CGEvent.tapEnable(tap: tap, enable: false) }
+    }
+
+    public func resume() {
+        suspended = false
+        if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+    }
+
     /// Returns true when the event must be swallowed (not forwarded to the focused app).
     private func handle(type: CGEventType, event: CGEvent) -> Bool {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            // Disabling our own tap can be reported here too; do not undo a suspend().
+            guard !suspended else { return false }
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             log.warning("event tap re-enabled after \(type.rawValue)")
             return false

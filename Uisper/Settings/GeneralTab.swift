@@ -6,11 +6,17 @@ struct GeneralTab: View {
 
     var body: some View {
         Form {
-            Picker("Hotkey", selection: Bindable(model.settings).hotkey) {
-                Text("⌥ Space").tag(HotkeyChoice.optionSpace)
-                Text("Fn / Globe (may clash with system dictation)").tag(HotkeyChoice.fn)
+            LabeledContent("Hotkey") {
+                VStack(alignment: .leading, spacing: 4) {
+                    HotkeyRecorderView(
+                        hotkey: Bindable(model.settings).hotkey,
+                        onRecordingChanged: model.setHotkeyRecording
+                    )
+                    Text("Click the field, then press your shortcut. Esc cancels, ⌫ resets to ⌥ Space.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
-            .onChange(of: model.settings.hotkey) { _, _ in model.hotkeyChoiceChanged() }
+            .onChange(of: model.settings.hotkey) { _, _ in model.hotkeyChanged() }
             Picker("Mode", selection: Bindable(model.settings).mode) {
                 Text("Hold to talk").tag(ActivationMode.hold)
                 Text("Press to toggle").tag(ActivationMode.toggle)

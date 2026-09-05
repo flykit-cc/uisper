@@ -64,7 +64,7 @@ final class AppModel {
     func startHotkey() {
         hotkey?.stop()
         let session = self.session
-        let monitor = HotkeyMonitor(choice: settings.hotkey) { event in session.handle(event) }
+        let monitor = HotkeyMonitor(hotkey: settings.hotkey) { event in session.handle(event) }
         do {
             try monitor.start()
             hotkey = monitor
@@ -76,8 +76,13 @@ final class AppModel {
         }
     }
 
-    func hotkeyChoiceChanged() {
-        hotkey?.choice = settings.hotkey
+    func hotkeyChanged() {
+        hotkey?.hotkey = settings.hotkey
+    }
+
+    /// While the recorder field is capturing, the tap must not fire dictation.
+    func setHotkeyRecording(_ on: Bool) {
+        if on { hotkey?.suspend() } else { hotkey?.resume() }
     }
 
     func setLaunchAtLogin(_ on: Bool) {

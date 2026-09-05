@@ -3,7 +3,6 @@ import Observation
 
 public enum EngineID: String, Codable, CaseIterable, Sendable { case apple, whisper }
 public enum ActivationMode: String, Codable, CaseIterable, Sendable { case hold, toggle }
-public enum HotkeyChoice: String, Codable, CaseIterable, Sendable { case optionSpace, fn }
 
 /// User preferences, backed by UserDefaults. Observable so SwiftUI updates.
 @MainActor
@@ -15,7 +14,7 @@ public final class SettingsStore {
 
     public var languageID: String { didSet { defaults.set(languageID, forKey: "languageID") } }
     public var mode: ActivationMode { didSet { defaults.set(mode.rawValue, forKey: "mode") } }
-    public var hotkey: HotkeyChoice { didSet { defaults.set(hotkey.rawValue, forKey: "hotkey") } }
+    public var hotkey: Hotkey { didSet { defaults.set(try? JSONEncoder().encode(hotkey), forKey: "hotkey") } }
     public var engine: EngineID { didSet { defaults.set(engine.rawValue, forKey: "engine") } }
     public var cleanupEnabled: Bool { didSet { defaults.set(cleanupEnabled, forKey: "cleanupEnabled") } }
     public var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: "launchAtLogin") } }
@@ -27,7 +26,12 @@ public final class SettingsStore {
         self.defaults = defaults
         languageID = defaults.string(forKey: "languageID") ?? "en-US"
         mode = ActivationMode(rawValue: defaults.string(forKey: "mode") ?? "") ?? .hold
-        hotkey = HotkeyChoice(rawValue: defaults.string(forKey: "hotkey") ?? "") ?? .optionSpace
+        if let data = defaults.data(forKey: "hotkey"), let stored = try? JSONDecoder().decode(Hotkey.self, from: data) {
+            hotkey = stored
+        } else {
+            // Migrate the pre-1.0 two-option picker, which stored a raw string.
+            hotkey = defaults.string(forKey: "hotkey") == "fn" ? .fn : .optionSpace
+        }
         engine = EngineID(rawValue: defaults.string(forKey: "engine") ?? "") ?? .apple
         cleanupEnabled = defaults.object(forKey: "cleanupEnabled") as? Bool ?? true
         launchAtLogin = defaults.bool(forKey: "launchAtLogin")

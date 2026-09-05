@@ -40,4 +40,15 @@ struct SettingsStoreTests {
         s.cycleLanguage(); #expect(s.languageID == "pt-BR")
         s.cycleLanguage(); #expect(s.languageID == "en-US")
     }
+
+    @Test func hotkeyPersistsAndMigrates() {
+        let d = freshDefaults()
+        let a = SettingsStore(defaults: d)
+        a.hotkey = Hotkey(keyCode: 105, modifiers: 0)
+        #expect(SettingsStore(defaults: d).hotkey == Hotkey(keyCode: 105, modifiers: 0))
+
+        let legacy = freshDefaults()
+        legacy.set("fn", forKey: "hotkey")
+        #expect(SettingsStore(defaults: legacy).hotkey == .fn)
+    }
 }

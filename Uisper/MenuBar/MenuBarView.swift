@@ -6,7 +6,7 @@ struct MenuBarView: View {
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        Text("uisper · \(shortLanguage(model.settings.languageID))")
+        Text("uisper · \(shortLanguage(model.settings.languageID)) · \(model.settings.hotkey.displayString)")
         if let err = model.hotkeyError { Text(err).foregroundStyle(.red) }
         Divider()
         Picker("Language", selection: Bindable(model.settings).languageID) {
