@@ -66,6 +66,7 @@ final class AppModel {
         hotkey?.stop()
         let session = self.session
         let monitor = HotkeyMonitor(hotkey: settings.hotkey) { event in session.handle(event) }
+        monitor.isDictating = { if case .listening = session.state { return true } else { return false } }
         do {
             try monitor.start()
             hotkey = monitor

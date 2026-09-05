@@ -59,18 +59,25 @@ struct PillView: View {
     }
 }
 
-/// Five bars that scale with the mic level.
+/// Five bars that dance with the mic level. Speech RMS is tiny (0.01–0.1), so use a dB scale.
 struct LevelMeter: View {
     let level: Float
+    private static let weights: [CGFloat] = [0.55, 0.8, 1, 0.8, 0.55]
+
+    private var normalized: CGFloat {
+        let db = 20 * log10(max(Double(level), 1e-5))          // -100 … 0
+        return CGFloat(min(1, max(0, (db + 50) / 42)))          // -50 dB → 0, -8 dB → 1
+    }
+
     var body: some View {
         HStack(spacing: 3) {
             ForEach(0..<5, id: \.self) { i in
                 Capsule()
                     .fill(.primary)
-                    .frame(width: 3, height: 6 + CGFloat(min(1, max(0, level * 3 - Float(i) * 0.15))) * 14)
+                    .frame(width: 3, height: 4 + normalized * Self.weights[i] * 18)
             }
         }
-        .frame(width: 28, height: 20)
-        .animation(.linear(duration: 0.05), value: level)
+        .frame(width: 28, height: 22)
+        .animation(.easeOut(duration: 0.08), value: normalized)
     }
 }

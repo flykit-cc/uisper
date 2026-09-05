@@ -18,6 +18,8 @@ public final class HotkeyMonitor {
     private var source: CFRunLoopSource?
     /// While set, the decoder is bypassed (no dictation) and every key press, including
     /// F14/F15 brightness events, is reported here and swallowed. Used by the recorder field.
+    /// Asked on every Escape press: return true while dictation is active (e.g. toggle mode), and Escape cancels.
+    public var isDictating: @MainActor () -> Bool = { false }
     public var recordingSink: (@MainActor (_ type: CGEventType, _ keyCode: Int64, _ flags: CGEventFlags) -> Bool)?
     private let log = Logger(subsystem: "cc.flykit.uisper", category: "hotkey")
 
@@ -104,6 +106,10 @@ public final class HotkeyMonitor {
         }
         let result = decoder.handle(type: type, keyCode: keyCode, flags: event.flags)
         if let e = result.event { onEvent(e) }
+        if result.event == nil, type == .keyDown, keyCode == 53, isDictating() {
+            onEvent(.cancelled)   // toggle mode: nothing is held, so the decoder cannot see the cancel
+            return true
+        }
         return result.swallow
     }
 }
