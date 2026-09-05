@@ -35,6 +35,7 @@ final class HotkeyRecorderNSView: NSView {
     /// recorded as a modifier-only chord.
     private var lastModifiers: CGEventFlags = []
     private var sawKeyDown = false
+    private var systemKeyMonitor: Any?
 
     private static let escape: UInt16 = 53
     private static let delete: UInt16 = 51
@@ -122,12 +123,22 @@ final class HotkeyRecorderNSView: NSView {
         sawKeyDown = false
         recording = true
         onRecordingChanged?(true)
+        // F14/F15 arrive as brightness system events, never as keyDown.
+        systemKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .systemDefined) { [weak self] event in
+            guard let self, recording,
+                  let key = HotkeyMonitor.brightnessKey(subtype: Int(event.subtype.rawValue), data1: event.data1),
+                  key.isDown else { return event }
+            apply(Hotkey(keyCode: key.keyCode, flags: Self.flags(event.modifierFlags)))
+            return nil
+        }
     }
 
     private func endRecording() {
         guard recording else { return }
         recording = false
         onRecordingChanged?(false)
+        if let systemKeyMonitor { NSEvent.removeMonitor(systemKeyMonitor) }
+        systemKeyMonitor = nil
     }
 
     /// NSEvent and CGEvent modifier raw values differ, so convert explicitly.

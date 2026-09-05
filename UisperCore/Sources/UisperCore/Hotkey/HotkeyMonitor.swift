@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 import os
@@ -29,7 +30,8 @@ public final class HotkeyMonitor {
         let mask: CGEventMask =
             (1 << CGEventType.keyDown.rawValue) |
             (1 << CGEventType.keyUp.rawValue) |
-            (1 << CGEventType.flagsChanged.rawValue)
+            (1 << CGEventType.flagsChanged.rawValue) |
+            (1 << Self.systemDefined.rawValue)
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -76,8 +78,30 @@ public final class HotkeyMonitor {
         if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
     }
 
+    /// NX_SYSDEFINED: macOS delivers F14/F15 (brightness) and other media keys this way, not as keyDown.
+    static let systemDefined = CGEventType(rawValue: 14)!
+
+    /// Maps a brightness system event to (virtual key code, isDown); nil for anything else.
+    public static func brightnessKey(subtype: Int, data1: Int) -> (keyCode: Int64, isDown: Bool)? {
+        guard subtype == 8 else { return nil }
+        let key = (data1 >> 16) & 0xFFFF
+        let isDown = ((data1 >> 8) & 0xFF) == 0x0A
+        switch key {
+        case 2: return (113, isDown)   // NX_KEYTYPE_BRIGHTNESS_UP   → F15
+        case 3: return (107, isDown)   // NX_KEYTYPE_BRIGHTNESS_DOWN → F14
+        default: return nil
+        }
+    }
+
     /// Returns true when the event must be swallowed (not forwarded to the focused app).
     private func handle(type: CGEventType, event: CGEvent) -> Bool {
+        if type == Self.systemDefined {
+            guard let ns = NSEvent(cgEvent: event),
+                  let key = Self.brightnessKey(subtype: Int(ns.subtype.rawValue), data1: ns.data1) else { return false }
+            let result = decoder.handle(type: key.isDown ? .keyDown : .keyUp, keyCode: key.keyCode, flags: event.flags)
+            if let e = result.event { onEvent(e) }
+            return result.swallow
+        }
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             // Disabling our own tap can be reported here too; do not undo a suspend().
             guard !suspended else { return false }
