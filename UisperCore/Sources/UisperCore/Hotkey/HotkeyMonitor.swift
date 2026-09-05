@@ -16,7 +16,9 @@ public final class HotkeyMonitor {
     private let onEvent: @MainActor (HotkeyEvent) -> Void
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
-    private var suspended = false
+    /// While set, the decoder is bypassed (no dictation) and every key press, including
+    /// F14/F15 brightness events, is reported here and swallowed. Used by the recorder field.
+    public var recordingSink: (@MainActor (_ keyCode: Int64, _ flags: CGEventFlags) -> Void)?
     private let log = Logger(subsystem: "cc.flykit.uisper", category: "hotkey")
 
     public init(hotkey: Hotkey, onEvent: @escaping @MainActor (HotkeyEvent) -> Void) {
@@ -66,18 +68,6 @@ public final class HotkeyMonitor {
         source = nil
     }
 
-    /// Stops delivering events without tearing the tap down, so the recorder field in
-    /// Settings can capture the current hotkey instead of starting dictation.
-    public func suspend() {
-        suspended = true
-        if let tap { CGEvent.tapEnable(tap: tap, enable: false) }
-    }
-
-    public func resume() {
-        suspended = false
-        if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
-    }
-
     /// NX_SYSDEFINED: macOS delivers F14/F15 (brightness) and other media keys this way, not as keyDown.
     static let systemDefined = CGEventType(rawValue: 14)!
 
@@ -103,8 +93,6 @@ public final class HotkeyMonitor {
             return result.swallow
         }
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            // Disabling our own tap can be reported here too; do not undo a suspend().
-            guard !suspended else { return false }
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             log.warning("event tap re-enabled after \(type.rawValue)")
             return false

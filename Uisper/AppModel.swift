@@ -81,8 +81,12 @@ final class AppModel {
     }
 
     /// While the recorder field is capturing, the tap must not fire dictation.
-    func setHotkeyRecording(_ on: Bool) {
-        if on { hotkey?.suspend() } else { hotkey?.resume() }
+    func setHotkeyRecording(_ on: Bool, apply: @escaping (Hotkey) -> Void) {
+        if on {
+            hotkey?.recordingSink = { @MainActor code, flags in apply(Hotkey(keyCode: code, flags: flags)) }
+        } else {
+            hotkey?.recordingSink = nil
+        }
     }
 
     func setLaunchAtLogin(_ on: Bool) {

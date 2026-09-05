@@ -6,7 +6,8 @@ import UisperCore
 /// hotkey. Esc cancels, ⌫ resets to ⌥ Space.
 struct HotkeyRecorderView: NSViewRepresentable {
     @Binding var hotkey: Hotkey
-    let onRecordingChanged: (Bool) -> Void
+    /// Called with `true` and the recorder's apply function when recording starts, `false` when it ends.
+    let onRecordingChanged: (Bool, @escaping (Hotkey) -> Void) -> Void
 
     func makeNSView(context: Context) -> HotkeyRecorderNSView {
         let view = HotkeyRecorderNSView()
@@ -28,14 +29,13 @@ struct HotkeyRecorderView: NSViewRepresentable {
 final class HotkeyRecorderNSView: NSView {
     var hotkey: Hotkey = .optionSpace { didSet { needsDisplay = true } }
     var onChange: ((Hotkey) -> Void)?
-    var onRecordingChanged: ((Bool) -> Void)?
+    var onRecordingChanged: ((Bool, @escaping (Hotkey) -> Void) -> Void)?
 
     private var recording = false { didSet { needsDisplay = true } }
     /// The modifier set seen on the previous flagsChanged, so releasing them all can be
     /// recorded as a modifier-only chord.
     private var lastModifiers: CGEventFlags = []
     private var sawKeyDown = false
-    private var systemKeyMonitor: Any?
 
     private static let escape: UInt16 = 53
     private static let delete: UInt16 = 51
@@ -90,16 +90,15 @@ final class HotkeyRecorderNSView: NSView {
         return true
     }
 
+    /// Only Esc and ⌫ are handled here; every other key arrives through the global tap
+    /// (see `HotkeyMonitor.recordingSink`), which also sees F14/F15.
     override func keyDown(with event: NSEvent) {
         guard recording else { return super.keyDown(with: event) }
         sawKeyDown = true
         switch event.keyCode {
-        case Self.escape:
-            endRecording()
-        case Self.delete:
-            apply(.optionSpace)
-        default:
-            apply(Hotkey(keyCode: Int64(event.keyCode), flags: Self.flags(event.modifierFlags)))
+        case Self.escape: endRecording()
+        case Self.delete: apply(.optionSpace)
+        default: break
         }
     }
 
@@ -122,23 +121,13 @@ final class HotkeyRecorderNSView: NSView {
         lastModifiers = []
         sawKeyDown = false
         recording = true
-        onRecordingChanged?(true)
-        // F14/F15 arrive as brightness system events, never as keyDown.
-        systemKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .systemDefined) { [weak self] event in
-            guard let self, recording,
-                  let key = HotkeyMonitor.brightnessKey(subtype: Int(event.subtype.rawValue), data1: event.data1),
-                  key.isDown else { return event }
-            apply(Hotkey(keyCode: key.keyCode, flags: Self.flags(event.modifierFlags)))
-            return nil
-        }
+        onRecordingChanged?(true) { [weak self] in self?.apply($0) }
     }
 
     private func endRecording() {
         guard recording else { return }
         recording = false
-        onRecordingChanged?(false)
-        if let systemKeyMonitor { NSEvent.removeMonitor(systemKeyMonitor) }
-        systemKeyMonitor = nil
+        onRecordingChanged?(false) { _ in }
     }
 
     /// NSEvent and CGEvent modifier raw values differ, so convert explicitly.
