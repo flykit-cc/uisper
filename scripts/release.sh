@@ -17,5 +17,7 @@ Native, fully local dictation for macOS 26 on Apple silicon.
 
 **Install:** unzip, move uisper.app to Applications, then **right-click > Open** once (the build is not notarized). Grant Microphone, Accessibility and Input Monitoring when asked, then relaunch.
 
-Turn on Apple Intelligence in System Settings for the grammar cleanup step.
+**First run** downloads two models it then keeps: about 600 MB for speech and about 2.1 GB for the cleanup. Settings > General shows the progress. Dictation works meanwhile, without the cleanup.
+
+Apple Intelligence is optional. uisper ships its own models; Apple's are selectable in Settings if you prefer them.
 NOTES

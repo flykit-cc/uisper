@@ -41,12 +41,17 @@ public final class DictationSession {
     private var engineTask: Task<String, Error>?
     private var pressedAt: ContinuousClock.Instant?
     private var resetTask: Task<Void, Never>?
+    private var maxDurationTask: Task<Void, Never>?
     /// Set once the user has let go: stops a slow engine task from opening the mic afterwards.
     private var stopRequested = false
     /// What the last dictation inserted, and where, so the next one can see what the user fixed.
     private var lastInsertion: (text: String, bundleID: String?)?
 
     private static let accidentalTap: Duration = .milliseconds(300)
+    /// Toggle mode has nothing to end a dictation the user walked away from, and the batch
+    /// engines hold every sample until it ends. Finish rather than cancel, so the words spoken
+    /// so far are still inserted.
+    static let maxDictation: Duration = .seconds(600)
     /// Roughly 800 tokens of names, which still leaves room in the smallest cleanup window.
     static let vocabularyLimit = 200
 
@@ -113,6 +118,8 @@ public final class DictationSession {
     }
 
     public func cancel() {
+        maxDurationTask?.cancel()
+        maxDurationTask = nil
         engineTask?.cancel()
         engineTask = nil
         stopRequested = true
@@ -131,6 +138,13 @@ public final class DictationSession {
         pressedAt = .now
         stopRequested = false
         state = .listening(text: "", volatile: "")
+        maxDurationTask?.cancel()
+        maxDurationTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.maxDictation)
+            guard !Task.isCancelled, let self, case .listening = state else { return }
+            log.info("dictation hit the \(Self.maxDictation, privacy: .public) limit, finishing")
+            finishListening()
+        }
         let locale = settings.locale
         let engine = self.engine
         engineTask = Task { [weak self] in
@@ -159,6 +173,8 @@ public final class DictationSession {
             cancel()
             return
         }
+        maxDurationTask?.cancel()
+        maxDurationTask = nil
         stopRequested = true
         audio.stop()
         state = .polishing(text: accumulator.full)

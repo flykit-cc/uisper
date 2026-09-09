@@ -128,4 +128,10 @@ struct DictationSessionTests {
         s.handle(.pressed)                          // second press stops
         #expect(await waitUntil { !inserter.inserted.isEmpty })
     }
+
+    /// Ten minutes, not cancelled: a walked-away toggle must not hold audio for ever, and the
+    /// words already spoken are still the user's.
+    @Test func aDictationHasAnUpperBound() {
+        #expect(DictationSession.maxDictation == .seconds(600))
+    }
 }
