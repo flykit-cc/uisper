@@ -28,7 +28,7 @@ public final class DictationSession {
     public private(set) var state: SessionState = .idle
     public var audioLevel: Float { audio.level }
 
-    private let engine: SpeechEngine
+    private let engines: [EngineID: any SpeechEngine]
     private let cleaner: TranscriptCleaner
     private let inserter: TextInserting
     private let audio: AudioSource
@@ -43,11 +43,15 @@ public final class DictationSession {
     private var resetTask: Task<Void, Never>?
     /// Set once the user has let go: stops a slow engine task from opening the mic afterwards.
     private var stopRequested = false
+    /// What the last dictation inserted, and where, so the next one can see what the user fixed.
+    private var lastInsertion: (text: String, bundleID: String?)?
 
     private static let accidentalTap: Duration = .milliseconds(300)
+    /// Roughly 800 tokens of names, which still leaves room in the smallest cleanup window.
+    static let vocabularyLimit = 200
 
     public init(
-        engine: SpeechEngine,
+        engines: [EngineID: any SpeechEngine],
         cleaner: TranscriptCleaner,
         inserter: TextInserting,
         audio: AudioSource,
@@ -55,7 +59,7 @@ public final class DictationSession {
         vocabulary: VocabularyStore,
         contextProvider: @escaping @MainActor () -> AppContext? = { nil }
     ) {
-        self.engine = engine
+        self.engines = engines
         self.cleaner = cleaner
         self.inserter = inserter
         self.audio = audio
@@ -79,6 +83,35 @@ public final class DictationSession {
         }
     }
 
+    /// The engine picked in Settings, falling back to Apple when it is not in this build.
+    /// Read once per dictation: `prepare`, `preferredFormat` and `start` must agree, or a
+    /// mid-dictation switch could feed one engine's audio format to another.
+    private var engine: any SpeechEngine {
+        engines[settings.engine] ?? engines[.apple] ?? engines.values.first!
+    }
+
+    /// Downloads and loads whatever the chosen engine needs, so the first hotkey press is not
+    /// the thing that waits on it.
+    public func prepareEngine(locale: Locale) async throws {
+        try await engine.prepare(locale: locale)
+    }
+
+    /// `prepare` on a cold engine is a model download, and a press during it would otherwise sit
+    /// in `.polishing` for its whole length and then report "Nothing heard.", swallowing every
+    /// press in between. Give up quickly instead and say why; the download itself keeps running
+    /// inside the engine, so a later press finds it ready.
+    private static func prepare(_ engine: any SpeechEngine, locale: Locale) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { try await engine.prepare(locale: locale) }
+            group.addTask {
+                try await Task.sleep(for: .seconds(2))
+                throw SpeechEngineError.assetsMissing(locale.identifier)
+            }
+            defer { group.cancelAll() }
+            try await group.next()
+        }
+    }
+
     public func cancel() {
         engineTask?.cancel()
         engineTask = nil
@@ -99,9 +132,10 @@ public final class DictationSession {
         stopRequested = false
         state = .listening(text: "", volatile: "")
         let locale = settings.locale
+        let engine = self.engine
         engineTask = Task { [weak self] in
             guard let self else { return "" }
-            try await engine.prepare(locale: locale)
+            try await Self.prepare(engine, locale: locale)
             let format = await engine.preferredFormat()
             // Last chance to bail: past this line the mic is live and only `audio.stop()`
             // closes it, so never open it for a press the user has already ended.
@@ -129,7 +163,6 @@ public final class DictationSession {
         audio.stop()
         state = .polishing(text: accumulator.full)
         let locale = settings.locale
-        let words = vocabulary.words
         let cleanupOn = settings.cleanupEnabled
         Task { [weak self] in
             guard let self else { return }
@@ -138,6 +171,8 @@ public final class DictationSession {
             // wedged app. A slow tap callback gets the tap disabled by the system.
             // Only the cleaner uses the context, so with cleanup off nothing on screen is read.
             let context = cleanupOn ? contextProvider() : nil
+            await learnCorrections(from: context)
+            let words = vocabulary.words
             do {
                 let raw = try await engineTask.value
                 self.engineTask = nil
@@ -149,9 +184,24 @@ public final class DictationSession {
                     do { text = try await cleaner.clean(raw, locale: locale, vocabulary: words, context: context) }
                     catch { log.error("cleanup failed, inserting raw: \(error.localizedDescription, privacy: .public)") }
                     if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { text = raw }
+                    // The engine hears "flykit" as two words and the cleanup model will not
+                    // rejoin it, so do it here where the answer is the user's own spelling.
+                    text = VocabularySpelling.apply(words, to: text)
                 }
                 // Trailing space: dictation usually ends in punctuation, and the next words continue after a space.
-                let result = await inserter.insert(text.trimmingCharacters(in: .whitespacesAndNewlines) + " ")
+                let inserted = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                let result = await inserter.insert(inserted + " ")
+                // Only what actually reached the field: `copiedOnly` means secure input refused
+                // it, and that text must not reach the log or be diffed against someone's screen.
+                if case .copiedOnly = result {
+                    lastInsertion = nil
+                } else {
+                    lastInsertion = (inserted, context?.bundleID)
+                    // The system log is capped and rotated by macOS, so this cannot grow unbounded.
+                    if settings.debugLogging {
+                        log.info("raw: \(raw, privacy: .public)\ncleaned: \(text, privacy: .public)")
+                    }
+                }
                 state = .inserted(result: result)
                 scheduleIdle(after: { if case .copiedOnly = result { return .seconds(2) } else { return .milliseconds(400) } }())
             } catch is CancellationError {
@@ -160,6 +210,46 @@ public final class DictationSession {
                 fail(error.localizedDescription)
             }
         }
+    }
+
+    /// Adds words the user fixed by hand after the last dictation to the vocabulary, so the
+    /// speech engine and the cleaner both spell them right next time.
+    ///
+    /// The comparison rides on the context read that already happens here: whatever was
+    /// inserted last time sits in `surroundingText` now, edits and all. No polling, no timer.
+    /// It only fires in the same app, because elsewhere the text before the caret is someone
+    /// else's. `surroundingText` is capped, so a long insertion is compared on its tail.
+    private func learnCorrections(from context: AppContext?) async {
+        // Each guard here is a silent no-op, and between them they explain every "it did not
+        // learn anything" report, so say which one stopped it.
+        guard let (inserted, bundleID) = lastInsertion else {
+            log.info("learn: nothing inserted last time"); return
+        }
+        guard let context else { log.info("learn: no window context"); return }
+        guard context.bundleID == bundleID else {
+            log.info("learn: different app now (\(context.bundleID ?? "nil", privacy: .public) was \(bundleID ?? "nil", privacy: .public))"); return
+        }
+        // A terminal hides its text from Accessibility, but can hand over the whole visible
+        // screen. Only worth the synthetic keystroke here, where it buys a learned word.
+        var screen = context.surroundingText
+        if screen == nil, TerminalScreenReader.supports(context.bundleID) {
+            screen = await TerminalScreenReader.screenText(bundleID: context.bundleID)
+        }
+        guard let onScreen = screen else {
+            log.info("learn: \(context.appName ?? context.bundleID ?? "this app", privacy: .public) does not expose its text to Accessibility"); return
+        }
+        lastInsertion = nil
+        // Past the cap the tail begins mid-word, and that half-word reads as a correction of the
+        // whole one ("tomorrow" -> "rrow"). Nothing here is salvageable, so learn nothing.
+        guard inserted.utf16.count < WindowContextReader.textLimit else { return }
+        let learned = CorrectionLearner.extractCorrections(
+            originalText: inserted, fieldValue: onScreen, existingDictionary: vocabulary.words)
+        guard !learned.isEmpty else {
+            log.info("learn: no corrections found in the edits"); return
+        }
+        for word in learned { vocabulary.add(word) }
+        log.info("learned \(learned.count) correction(s) from edits")
+        do { try vocabulary.save() } catch { log.error("vocabulary save: \(error.localizedDescription, privacy: .public)") }
     }
 
     private func fail(_ message: String) {

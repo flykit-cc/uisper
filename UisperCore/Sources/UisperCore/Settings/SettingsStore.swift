@@ -1,7 +1,8 @@
 import Foundation
 import Observation
 
-public enum EngineID: String, Codable, CaseIterable, Sendable { case apple, whisper }
+/// `apple` is macOS's own SpeechAnalyzer. `parakeet` is Parakeet TDT v3 on the Neural Engine.
+public enum EngineID: String, Codable, CaseIterable, Sendable { case apple, parakeet }
 public enum ActivationMode: String, Codable, CaseIterable, Sendable { case hold, toggle }
 /// `builtIn` is the model shipped inside the app (MLX). `apple` is Apple Intelligence.
 public enum CleanupEngine: String, Codable, CaseIterable, Sendable { case builtIn, apple }
@@ -21,6 +22,9 @@ public final class SettingsStore {
     public var cleanupEnabled: Bool { didSet { defaults.set(cleanupEnabled, forKey: "cleanupEnabled") } }
     public var cleanupEngine: CleanupEngine { didSet { defaults.set(cleanupEngine.rawValue, forKey: "cleanupEngine") } }
     public var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: "launchAtLogin") } }
+    /// Writes the raw and cleaned transcript to the system log so dictation quality can be checked.
+    /// Off by default: the text is what the user dictated.
+    public var debugLogging: Bool { didSet { defaults.set(debugLogging, forKey: "debugLogging") } }
 
     public var languages: [String] { Self.supportedLanguages }
     public var locale: Locale { Locale(identifier: languageID) }
@@ -35,10 +39,11 @@ public final class SettingsStore {
             // Migrate the pre-1.0 two-option picker, which stored a raw string.
             hotkey = defaults.string(forKey: "hotkey") == "fn" ? .fn : .optionSpace
         }
-        engine = EngineID(rawValue: defaults.string(forKey: "engine") ?? "") ?? .apple
+        engine = EngineID(rawValue: defaults.string(forKey: "engine") ?? "") ?? .parakeet
         cleanupEnabled = defaults.object(forKey: "cleanupEnabled") as? Bool ?? true
         cleanupEngine = CleanupEngine(rawValue: defaults.string(forKey: "cleanupEngine") ?? "") ?? .builtIn
         launchAtLogin = defaults.bool(forKey: "launchAtLogin")
+        debugLogging = defaults.bool(forKey: "debugLogging")
     }
 
     public func cycleLanguage() {

@@ -31,7 +31,7 @@ public enum SpeechEngineError: Error, LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .unsupportedLocale(let l): return "Language \(l) is not supported by this engine."
-        case .assetsMissing(let l): return "Speech model for \(l) is not installed yet."
+        case .assetsMissing(let l): return "The speech model for \(l) is still downloading. Try again shortly."
         case .engineFailed(let m): return m
         }
     }

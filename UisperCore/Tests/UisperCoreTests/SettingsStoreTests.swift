@@ -16,7 +16,7 @@ struct SettingsStoreTests {
         #expect(s.languageID == "en-US")
         #expect(s.mode == .hold)
         #expect(s.hotkey == .optionSpace)
-        #expect(s.engine == .apple)
+        #expect(s.engine == .parakeet)
         #expect(s.cleanupEnabled == true)
         #expect(s.launchAtLogin == false)
         #expect(s.locale.identifier == "en-US")

@@ -43,7 +43,7 @@ public actor FoundationModelsCleaner: TranscriptCleaner {
             // A fresh session per chunk: a session accumulates its transcript and would eventually overflow.
             let session = Self.makeSession(instructions: instructions)
             let response = try await session.respond(
-                to: chunk, generating: CleanedTranscript.self,
+                to: CleanupPrompt.wrap(chunk), generating: CleanedTranscript.self,
                 options: GenerationOptions(sampling: .greedy))
             let piece = response.content.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !piece.isEmpty { pieces.append(piece) }

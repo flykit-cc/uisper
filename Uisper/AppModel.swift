@@ -14,9 +14,15 @@ final class AppModel {
     let session: DictationSession
     private(set) var hotkeyError: String?
     let modelDownload: ModelDownload
+    let speechDownload = SpeechModelDownload()
     /// Why the Apple engine cannot run, or nil when it can.
     private let appleNotice: String?
     private var mlx: MLXCleaner?
+
+    /// One line for the Settings pane about the speech model, or nil when there is nothing to say.
+    var speechNotice: String? {
+        settings.engine == .parakeet ? speechDownload.notice : nil
+    }
 
     /// One line for the Settings pane about the chosen engine, or nil when it is ready.
     var cleanupNotice: String? {
@@ -41,7 +47,8 @@ final class AppModel {
         let settings = SettingsStore()
         let vocabulary = VocabularyStore(fileURL: VocabularyStore.defaultURL())
         let inserter = TextInserter()
-        let engine = AppleSpeechEngine(contextualStrings: { MainActor.assumeIsolated { vocabulary.words } })
+        let apple = AppleSpeechEngine(contextualStrings: { MainActor.assumeIsolated { vocabulary.words } })
+        let speechEngines: [EngineID: any SpeechEngine] = [.apple: apple, .parakeet: ParakeetEngine(download: speechDownload)]
         let modelDownload = ModelDownload()
         var engines: [CleanupEngine: TranscriptCleaner] = [:]
         let mlx = MLXCleaner(directory: modelDownload.directory)
@@ -54,7 +61,7 @@ final class AppModel {
         }
         let cleaner = CleanupRouter(settings: settings, engines: engines)
         let session = DictationSession(
-            engine: engine, cleaner: cleaner, inserter: inserter, audio: AudioCapture(),
+            engines: speechEngines, cleaner: cleaner, inserter: inserter, audio: AudioCapture(),
             settings: settings, vocabulary: vocabulary,
             contextProvider: { WindowContextReader().read() }
         )
@@ -67,6 +74,7 @@ final class AppModel {
         self.mlx = mlx
         self.overlay = OverlayController(session: session, anchor: { inserter.focusedWindowFrame() })
         ensureModel()
+        ensureSpeechModel()
         startHotkey()
         let granted = Permissions.allGranted
         log.info("launch: permissions granted=\(granted, privacy: .public)")
@@ -107,6 +115,17 @@ final class AppModel {
         Task {
             do { try await modelDownload.ensure() } catch { return }
             await mlx.prewarm()
+        }
+    }
+
+    /// Fetches and loads the speech model ahead of the first dictation, so the hotkey does not
+    /// sit on a download: 600 MB for Parakeet, the locale assets for Apple. Both are no-ops once
+    /// installed, so this is cheap to call on every engine or language change.
+    func ensureSpeechModel() {
+        let locale = settings.locale
+        Task { [session] in
+            do { try await session.prepareEngine(locale: locale) }
+            catch { log.error("speech model: \(error.localizedDescription, privacy: .public)") }
         }
     }
 

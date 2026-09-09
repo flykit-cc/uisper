@@ -45,7 +45,7 @@ actor MLXCleaner: TranscriptCleaner {
         let instructions = CleanupPrompt.instructions(locale: locale, vocabulary: vocabulary, context: context)
         for chunk in CleanupPrompt.chunks(trimmed) {
             let started = ContinuousClock.now
-            let piece = Self.stripThinking(try await Self.session(model, instructions).respond(to: chunk))
+            let piece = Self.stripThinking(try await Self.session(model, instructions).respond(to: CleanupPrompt.wrap(chunk)))
             log.info("cleaned \(chunk.count) chars in \(ContinuousClock.now - started, privacy: .public)")
             if !piece.isEmpty { pieces.append(piece) }
         }

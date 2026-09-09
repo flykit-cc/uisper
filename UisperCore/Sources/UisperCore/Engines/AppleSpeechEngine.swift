@@ -91,7 +91,7 @@ public final class AppleSpeechEngine: SpeechEngine {
         SpeechTranscriber(
             locale: locale,
             transcriptionOptions: [],
-            reportingOptions: [.volatileResults, .fastResults],
+            reportingOptions: [.volatileResults],
             attributeOptions: []
         )
     }

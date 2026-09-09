@@ -7,13 +7,17 @@ import Carbon.HIToolbox
 @MainActor
 public struct WindowContextReader {
     /// Enough for tone, names and the current sentence; small enough to stay inside the model window.
-    public static let textLimit = 600
+    nonisolated public static let textLimit = 600
 
     public init() {}
 
     public func read() -> AppContext? {
         guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        // Chrome and every Electron app (Claude, VS Code) build their accessibility tree lazily
+        // and expose nothing until an assistive app asks. This is the documented way to ask.
+        // Unsupported elsewhere, and on some Electron versions, so the result is ignored.
+        AXUIElementSetAttributeValue(appElement, "AXManualAccessibility" as CFString, kCFBooleanTrue)
         var title: String?
         if let window = attribute(appElement, kAXFocusedWindowAttribute) {
             // swiftlint:disable:next force_cast
@@ -47,11 +51,20 @@ public struct WindowContextReader {
         let utf16 = text.utf16
         let end = min(max(offset ?? utf16.count, 0), utf16.count)
         let start = max(end - limit, 0)
-        let s = utf16.index(utf16.startIndex, offsetBy: start)
+        // One unit before the cut, so a cut that landed inside a word is visible as a
+        // non-space on the left. A half word here reads downstream as a correction of the
+        // whole one ("MacBook" -> "Book"), so drop it and start at the next word.
+        let from = start > 0 ? start - 1 : start
+        let s = utf16.index(utf16.startIndex, offsetBy: from)
         let e = utf16.index(utf16.startIndex, offsetBy: end)
         // Decoding by units tolerates a cut inside a surrogate pair (one replacement character at the edge).
-        let piece = String(decoding: Array(utf16[s..<e]), as: UTF16.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        return piece.isEmpty ? nil : piece
+        var piece = Substring(String(decoding: Array(utf16[s..<e]), as: UTF16.self))
+        if start > 0 {
+            // No whitespace at all means the window is one long run: keep it minus the probe unit.
+            piece = piece.firstIndex(where: \.isWhitespace).map { piece[$0...] } ?? piece.dropFirst()
+        }
+        let out = piece.trimmingCharacters(in: .whitespacesAndNewlines)
+        return out.isEmpty ? nil : out
     }
 
     private func attribute(_ element: AXUIElement, _ name: String) -> AnyObject? {

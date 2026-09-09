@@ -37,7 +37,7 @@ struct DictationSessionTests {
         let cleaner = FakeCleaner()
         let inserter = FakeInserter()
         let audio = FakeAudio()
-        let session = DictationSession(engine: engine, cleaner: cleaner, inserter: inserter, audio: audio, settings: settings, vocabulary: vocab, contextProvider: contextProvider)
+        let session = DictationSession(engines: [.apple: engine], cleaner: cleaner, inserter: inserter, audio: audio, settings: settings, vocabulary: vocab, contextProvider: contextProvider)
         return (session, engine, cleaner, inserter, audio, settings)
     }
 
