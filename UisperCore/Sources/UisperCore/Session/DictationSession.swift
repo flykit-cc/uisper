@@ -52,8 +52,6 @@ public final class DictationSession {
     /// engines hold every sample until it ends. Finish rather than cancel, so the words spoken
     /// so far are still inserted.
     static let maxDictation: Duration = .seconds(600)
-    /// Roughly 800 tokens of names, which still leaves room in the smallest cleanup window.
-    static let vocabularyLimit = 200
 
     public init(
         engines: [EngineID: any SpeechEngine],
