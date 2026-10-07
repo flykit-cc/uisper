@@ -69,7 +69,7 @@ struct DictationSessionTests {
         #expect(await waitUntil { s.state == .idle })
     }
 
-    @Test func cleanupOffInsertsRawAndReadsNoScreenText() async {
+    @Test func cleanupOffInsertsRawButStillReadsTheScreenForLearning() async {
         var contextReads = 0
         let (s, _, cleaner, inserter, _, _, _) = makeSession(cleanup: false, contextProvider: { contextReads += 1; return nil })
         s.handle(.pressed)
@@ -78,7 +78,18 @@ struct DictationSessionTests {
         #expect(await waitUntil { !inserter.inserted.isEmpty })
         #expect(cleaner.calls.isEmpty)
         #expect(inserter.inserted == ["hello world "])
-        #expect(contextReads == 0)
+        #expect(contextReads == 1)
+    }
+
+    @Test func cleanupOffStillAppliesTheUsersSpelling() async {
+        let (s, _, _, inserter, _, _, vocab) = makeSession(
+            script: [TranscriptUpdate(text: "open claude code now", isFinal: true)], cleanup: false)
+        vocab.add("Claude Code")
+        s.handle(.pressed)
+        try? await Task.sleep(for: .milliseconds(350))
+        s.handle(.released)
+        #expect(await waitUntil { !inserter.inserted.isEmpty })
+        #expect(inserter.inserted == ["open Claude Code now "])
     }
 
     @Test func quickTapIsCancelled() async {

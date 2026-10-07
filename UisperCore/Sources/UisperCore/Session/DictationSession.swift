@@ -192,8 +192,8 @@ public final class DictationSession {
             // Read inside the task, not above: `finishListening` runs inside the CGEvent tap
             // callback, and `contextProvider` makes Accessibility calls that can block on a
             // wedged app. A slow tap callback gets the tap disabled by the system.
-            // Only the cleaner uses the context, so with cleanup off nothing on screen is read.
-            let context = cleanupOn ? contextProvider() : nil
+            // Read even with cleanup off: learning needs it to see the user's fixes.
+            let context = contextProvider()
             await learnCorrections(from: context)
             let words = vocabulary.words
             do {
@@ -210,10 +210,10 @@ public final class DictationSession {
                     // Again after the model, which leaves fillers in when the text is otherwise tidy.
                     text = FillerFilter.apply(text, languageID: languageID)
                     if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { text = raw }
-                    // The engine hears "flykit" as two words and the cleanup model will not
-                    // rejoin it, so do it here where the answer is the user's own spelling.
-                    text = VocabularySpelling.apply(words, to: text)
                 }
+                // The engine hears "flykit" as two words and the cleanup model will not rejoin it,
+                // so do it here, with or without cleanup, where the answer is the user's own spelling.
+                text = VocabularySpelling.apply(words, to: text)
                 // Trailing space: dictation usually ends in punctuation, and the next words continue after a space.
                 let inserted = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 let result = await inserter.insert(inserted + " ")
