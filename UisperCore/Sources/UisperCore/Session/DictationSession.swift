@@ -35,6 +35,7 @@ public final class DictationSession {
     private let settings: SettingsStore
     private let vocabulary: VocabularyStore
     private let contextProvider: @MainActor () -> AppContext?
+    private let now: @MainActor () -> ContinuousClock.Instant
     private let log = Logger(subsystem: "cc.flykit.uisper", category: "session")
 
     private var accumulator = TranscriptAccumulator()
@@ -45,13 +46,18 @@ public final class DictationSession {
     /// Set once the user has let go: stops a slow engine task from opening the mic afterwards.
     private var stopRequested = false
     /// What the last dictation inserted, and where, so the next one can see what the user fixed.
-    private var lastInsertion: (text: String, bundleID: String?)?
+    private var lastInsertion: (text: String, bundleID: String?, at: ContinuousClock.Instant)?
 
     private static let accidentalTap: Duration = .milliseconds(300)
     /// Toggle mode has nothing to end a dictation the user walked away from, and the batch
     /// engines hold every sample until it ends. Finish rather than cancel, so the words spoken
     /// so far are still inserted.
     static let maxDictation: Duration = .seconds(600)
+    /// How long after an insertion the user's edits still count. Learning reads the screen only
+    /// when a dictation starts, never on a timer, because in Ghostty the read presses a key
+    /// combination that must not fire while the user types. Without a cap, edits and unrelated
+    /// typing from hours later would count.
+    static let learnWindow: Duration = .seconds(300)
 
     public init(
         engines: [EngineID: any SpeechEngine],
@@ -60,7 +66,8 @@ public final class DictationSession {
         audio: AudioSource,
         settings: SettingsStore,
         vocabulary: VocabularyStore,
-        contextProvider: @escaping @MainActor () -> AppContext? = { nil }
+        contextProvider: @escaping @MainActor () -> AppContext? = { nil },
+        now: @escaping @MainActor () -> ContinuousClock.Instant = { .now }
     ) {
         self.engines = engines
         self.cleaner = cleaner
@@ -69,6 +76,7 @@ public final class DictationSession {
         self.settings = settings
         self.vocabulary = vocabulary
         self.contextProvider = contextProvider
+        self.now = now
     }
 
     public func handle(_ event: HotkeyEvent) {
@@ -178,6 +186,7 @@ public final class DictationSession {
         state = .polishing(text: accumulator.full)
         let locale = settings.locale
         let cleanupOn = settings.cleanupEnabled
+        let languageID = settings.languageID
         Task { [weak self] in
             guard let self else { return }
             // Read inside the task, not above: `finishListening` runs inside the CGEvent tap
@@ -188,7 +197,8 @@ public final class DictationSession {
             await learnCorrections(from: context)
             let words = vocabulary.words
             do {
-                let raw = try await engineTask.value
+                // Fillers go first, so a dictation of only "um" reports "Nothing heard.".
+                let raw = FillerFilter.apply(try await engineTask.value, languageID: languageID)
                 self.engineTask = nil
                 guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     fail("Nothing heard."); return
@@ -197,6 +207,8 @@ public final class DictationSession {
                 if cleanupOn {
                     do { text = try await cleaner.clean(raw, locale: locale, vocabulary: words, context: context) }
                     catch { log.error("cleanup failed, inserting raw: \(error.localizedDescription, privacy: .public)") }
+                    // Again after the model, which leaves fillers in when the text is otherwise tidy.
+                    text = FillerFilter.apply(text, languageID: languageID)
                     if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { text = raw }
                     // The engine hears "flykit" as two words and the cleanup model will not
                     // rejoin it, so do it here where the answer is the user's own spelling.
@@ -210,7 +222,7 @@ public final class DictationSession {
                 if case .copiedOnly = result {
                     lastInsertion = nil
                 } else {
-                    lastInsertion = (inserted, context?.bundleID)
+                    lastInsertion = (inserted, context?.bundleID, now())
                     // The system log is capped and rotated by macOS, so this cannot grow unbounded.
                     if settings.debugLogging {
                         log.info("raw: \(raw, privacy: .public)\ncleaned: \(text, privacy: .public)")
@@ -236,8 +248,12 @@ public final class DictationSession {
     private func learnCorrections(from context: AppContext?) async {
         // Each guard here is a silent no-op, and between them they explain every "it did not
         // learn anything" report, so say which one stopped it.
-        guard let (inserted, bundleID) = lastInsertion else {
+        guard let (inserted, bundleID, insertedAt) = lastInsertion else {
             log.info("learn: nothing inserted last time"); return
+        }
+        guard now() - insertedAt <= Self.learnWindow else {
+            lastInsertion = nil
+            log.info("learn: last insertion is older than \(Self.learnWindow, privacy: .public)"); return
         }
         guard let context else { log.info("learn: no window context"); return }
         guard context.bundleID == bundleID else {
@@ -261,7 +277,7 @@ public final class DictationSession {
         guard !learned.isEmpty else {
             log.info("learn: no corrections found in the edits"); return
         }
-        for word in learned { vocabulary.add(word) }
+        for word in learned { vocabulary.add(word, source: .learned) }
         log.info("learned \(learned.count) correction(s) from edits")
         do { try vocabulary.save() } catch { log.error("vocabulary save: \(error.localizedDescription, privacy: .public)") }
     }
