@@ -11,6 +11,12 @@ public enum CorrectionLearner {
     /// How many words worse than the best match a later copy may be and still win. An edited
     /// copy differs from the original by the words the user changed, which is very few.
     static let editedRegionSlack = 3
+    /// OpenWhispr's rewrite guard: when most of the words changed, the user rewrote the sentence
+    /// (usually because the cleanup got it wrong), and the swaps inside it are not mishearings.
+    static let maxChangedShare = 0.5
+    /// Below this many words the share is meaningless: fixing both halves of "Sinaid Jhon" changes
+    /// all of it and is exactly what learning is for.
+    static let rewriteGuardMinWords = 4
     /// The corrected words to add to the vocabulary, or empty when the edits are not corrections.
     /// - Parameters:
     ///   - originalText: what dictation inserted.
@@ -28,6 +34,11 @@ public enum CorrectionLearner {
         guard !originalWords.isEmpty, !editedWords.isEmpty else { return [] }
 
         let substitutions = substitutions(from: originalWords, to: editedWords)
+        if originalWords.count >= rewriteGuardMinWords {
+            let kept = Set(editedWords.map { $0.lowercased() })
+            let changed = originalWords.filter { !kept.contains($0.lowercased()) }.count
+            guard Double(changed) / Double(originalWords.count) <= maxChangedShare else { return [] }
+        }
 
         let known = Set(existingDictionary.map { $0.lowercased() })
         var seen = Set<String>()
@@ -36,7 +47,7 @@ public enum CorrectionLearner {
             let key = corrected.lowercased()
             guard !known.contains(key), seen.insert(key).inserted,
                   original.lowercased() != key, corrected.count >= minWordLength,
-                  isNameShaped(corrected), !Self.isSuffixEdit(original, corrected) else { continue }
+                  isNameShaped(corrected), !CommonWords.contains(corrected), !Self.isSuffixEdit(original, corrected) else { continue }
             let distance = editDistance(original.lowercased(), key)
             let longest = max(original.count, corrected.count)
             guard longest > 0, Double(distance) / Double(longest) <= maxEditRatio else { continue }

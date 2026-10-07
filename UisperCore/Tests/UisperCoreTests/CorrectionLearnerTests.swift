@@ -54,8 +54,27 @@ struct CorrectionLearnerTests {
     }
 
     /// Fixing both halves of a two-word name is the main use case; the old share guard blocked it.
+    /// "John" is an ordinary word the engine already spells, so only the rare half is learned.
     @Test func bothHalvesOfANameAreLearned() {
-        #expect(corrections("Sinaid and Jhon", "Sinead and John") == ["Sinead", "John"])
+        #expect(corrections("Sinaid and Jhon", "Sinead and John") == ["Sinead"])
+    }
+
+    @Test func commonWordsAreNeverLearned() {
+        #expect(corrections("we need the exciting part", "we need the existing part").isEmpty)
+    }
+
+    @Test func claudeIsLearned() {
+        #expect(corrections("I use clawed code daily", "I use Claude code daily") == ["Claude"])
+    }
+
+    @Test func aRewriteOfMostWordsLearnsNothing() {
+        #expect(corrections("I think we should sell the house next year",
+                            "I thing we could tell the horse next week").isEmpty)
+    }
+
+    @Test func aShortFixIsNotARewrite() {
+        // 2 of 3 words changed, but under `rewriteGuardMinWords` the guard does not apply.
+        #expect(corrections("Sinaid and Kayo", "Sinead and Kaio") == ["Sinead", "Kaio"])
     }
 
     @Test func ignoresARewrite() {
