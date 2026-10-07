@@ -23,8 +23,9 @@ public enum FillerFilter {
             options: .caseInsensitive) else { return text }
         let stripped = regex.stringByReplacingMatches(
             in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
-        // A removed filler can leave a comma with nothing after it ("So, um, we" → "So, we" is
-        // fine, but "hello, um" → "hello, "), so trim the ends.
-        return stripped.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: ",")))
+        // A filler right before punctuation leaves a space in front of it ("great um." → "great ."),
+        // and one at the end can leave a dangling comma ("hello, um" → "hello, "), so tidy both.
+        let tidied = stripped.replacingOccurrences(of: "\\s+([.,!?;:])", with: "$1", options: .regularExpression)
+        return tidied.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: ",")))
     }
 }

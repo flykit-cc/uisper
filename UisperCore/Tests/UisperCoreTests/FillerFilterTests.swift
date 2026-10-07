@@ -27,4 +27,8 @@ struct FillerFilterTests {
     @Test func fillerOnlyInputBecomesEmpty() {
         #expect(FillerFilter.apply("uh, um", languageID: "en-US") == "")
     }
+    @Test func noSpaceIsLeftBeforePunctuation() {
+        #expect(FillerFilter.apply("That was great um. Thanks hmm, really", languageID: "en-US")
+                == "That was great. Thanks really")
+    }
 }
