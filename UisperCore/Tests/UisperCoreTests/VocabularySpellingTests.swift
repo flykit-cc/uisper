@@ -37,7 +37,7 @@ struct VocabularySpellingTests {
         #expect(VocabularySpelling.splits(of: "flykit") == ["fl ykit", "fly kit", "flyk it"])
     }
 
-    // MARK: - Near misses
+    // MARK: - Casing
 
     private static let list = ["Claude Code", "Deepseek", "Deepseek Harness", "flykit", "Kaio", "dsh", "API"]
 
@@ -45,21 +45,8 @@ struct VocabularySpellingTests {
         VocabularySpelling.apply(Self.list, to: text)
     }
 
-    @Test func fixesAMisheardTwoWordName() {
-        #expect(fixed("I use clot code every day") == "I use Claude Code every day")
-    }
-
-    @Test func fixesAMisheardSingleWord() {
-        #expect(fixed("we ship fly kid tonight") == "we ship flykit tonight")
-    }
-
     @Test func correctsCasingToTheUsersSpelling() {
         #expect(fixed("open claude code now") == "open Claude Code now")
-    }
-
-    /// "Deepseek Harness" must win the whole phrase before "Deepseek" claims the first half.
-    @Test func theLongestEntryWins() {
-        #expect(fixed("run the deep seek harness") == "run the Deepseek Harness")
     }
 
     @Test func leavesUnrelatedTextAlone() {
@@ -67,19 +54,31 @@ struct VocabularySpellingTests {
         #expect(fixed(text) == text)
     }
 
-    /// Short entries are one edit from ordinary words, which is how the acoustic version
-    /// destroyed sentences. They are never fuzzy-matched.
-    @Test func shortEntriesAreNeverFuzzyMatched() {
-        let text = "put the dish in a pie and ask Cairo"
-        #expect(fixed(text) == text)
-    }
-
     @Test func punctuationAroundTheMatchSurvives() {
-        #expect(fixed("yes, clot code, exactly.") == "yes, Claude Code, exactly.")
+        #expect(fixed("yes, claude code, exactly.") == "yes, Claude Code, exactly.")
     }
 
     @Test func alreadyCorrectTextIsUntouched() {
         let text = "Claude Code and Deepseek and flykit"
         #expect(fixed(text) == text)
+    }
+
+    @Test func aNearbyWordIsNeverRewritten() {
+        #expect(VocabularySpelling.apply(["horse", "Claude Code"], to: "the house uses cloud code")
+                == "the house uses cloud code")
+    }
+
+    @Test func commonWordEntriesNeverRecase() {
+        #expect(VocabularySpelling.apply(["its", "Read"], to: "Its fine, read it") == "Its fine, read it")
+    }
+
+    @Test func multiWordEntriesRecase() {
+        #expect(VocabularySpelling.apply(["Claude Code"], to: "open claude code now") == "open Claude Code now")
+    }
+
+    /// Where entries overlap, the longer one keeps its spelling.
+    @Test func theLongestEntryKeepsItsCasing() {
+        #expect(VocabularySpelling.apply(["deepseek", "Deepseek Harness"], to: "run the deepseek harness")
+                == "run the Deepseek Harness")
     }
 }
