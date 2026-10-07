@@ -4,12 +4,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 VERSION="${1:?version, e.g. 0.1.0}"
 xcodegen generate --quiet
-xcodebuild -project Uisper.xcodeproj -scheme Uisper -configuration Release -derivedDataPath build -skipPackagePluginValidation -skipMacroValidation \
+xcodebuild -project Uisper.xcodeproj -scheme Uisper -configuration Release -derivedDataPath build.noindex -skipPackagePluginValidation -skipMacroValidation \
   MARKETING_VERSION="$VERSION" build 2>&1 | grep -E "error:|BUILD" || status=${PIPESTATUS[0]}
 (( ${status:-0} == 0 )) || { echo "build failed"; exit "$status"; }
-APP="build/Build/Products/Release/uisper.app"
+APP="build.noindex/Build/Products/Release/uisper.app"
 codesign --force --deep --sign - "$APP"          # ad-hoc: runs anywhere after right-click > Open
-ZIP="build/uisper-$VERSION.zip"
+ZIP="build.noindex/uisper-$VERSION.zip"
 rm -f "$ZIP"; ditto -c -k --keepParent "$APP" "$ZIP"
 echo "zip: $ZIP ($(du -h "$ZIP" | cut -f1))"
 gh release create "v$VERSION" "$ZIP" --title "uisper $VERSION" --notes-file - <<NOTES

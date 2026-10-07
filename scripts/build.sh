@@ -5,9 +5,9 @@ cd "$(dirname "$0")/.."
 xcodegen generate --quiet
 status=0
 xcodebuild -project Uisper.xcodeproj -scheme Uisper -configuration Debug -skipPackagePluginValidation -skipMacroValidation \
-  -derivedDataPath build build 2>&1 | grep -E "error:|warning: .*Uisper|BUILD" || status=${PIPESTATUS[0]}
+  -derivedDataPath build.noindex build 2>&1 | grep -E "error:|warning: .*Uisper|BUILD" || status=${PIPESTATUS[0]}
 (( status == 0 )) || { echo "build failed (xcodebuild exit $status)"; exit "$status"; }
-APP="build/Build/Products/Debug/uisper.app"
+APP="build.noindex/Build/Products/Debug/uisper.app"
 codesign --verify --strict "$APP"
 echo "signed ok: $APP"
 if [[ "${1:-}" == "--open" ]]; then open "$APP"; fi

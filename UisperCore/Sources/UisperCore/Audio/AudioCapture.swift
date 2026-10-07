@@ -8,7 +8,7 @@ import os
 public final class AudioCapture {
     public private(set) var level: Float = 0
 
-    private let engine = AVAudioEngine()
+    private var engine = AVAudioEngine()
     private var continuation: AsyncStream<AVAudioPCMBuffer>.Continuation?
     private let log = Logger(subsystem: "cc.flykit.uisper", category: "audio")
 
@@ -17,8 +17,16 @@ public final class AudioCapture {
     /// `sending`: the buffers are not Sendable, so the caller takes sole ownership of the stream.
     public func start(targetFormat: AVAudioFormat?) throws -> sending AsyncStream<AVAudioPCMBuffer> {
         stop()
+        // A fresh engine each time: a reused one keeps the mic format from before a device change
+        // (headphones in or out), and installTap then throws an Objective-C exception. Swift cannot
+        // catch it; AppKit swallows it, which corrupts the main actor's state and segfaults the app
+        // at the next isolation check.
+        engine = AVAudioEngine()
         let input = engine.inputNode
         let micFormat = input.outputFormat(forBus: 0)
+        guard micFormat.sampleRate > 0, micFormat.channelCount > 0 else {
+            throw SpeechEngineError.engineFailed("No microphone input available")
+        }
         let converter = try targetFormat.map { try BufferConverter(from: micFormat, to: $0) }
         let (stream, continuation) = AsyncStream<AVAudioPCMBuffer>.makeStream(bufferingPolicy: .unbounded)
         self.continuation = continuation

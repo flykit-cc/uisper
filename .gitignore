@@ -1,4 +1,4 @@
-build/
+build.noindex/
 *.xcodeproj
 .DS_Store
 xcuserdata/

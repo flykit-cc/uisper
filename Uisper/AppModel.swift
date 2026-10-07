@@ -104,8 +104,21 @@ final class AppModel {
             hotkeyError = nil
         } catch {
             hotkey = nil
+            if hotkeyError == nil { log.error("hotkey: \(error.localizedDescription, privacy: .public)") }
             hotkeyError = error.localizedDescription
-            log.error("hotkey: \(error.localizedDescription, privacy: .public)")
+            retryHotkeyLater()
+        }
+    }
+
+    private var hotkeyRetry: Task<Void, Never>?
+
+    /// A permission granted while uisper runs is not noticed by itself; keep trying until the tap starts.
+    private func retryHotkeyLater() {
+        guard hotkeyRetry == nil else { return }
+        hotkeyRetry = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            self?.hotkeyRetry = nil
+            self?.startHotkey()
         }
     }
 
