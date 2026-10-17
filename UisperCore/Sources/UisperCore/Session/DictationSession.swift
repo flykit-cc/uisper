@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import NaturalLanguage
 import Observation
 import os
 
@@ -34,6 +35,7 @@ public final class DictationSession {
     private let audio: AudioSource
     private let settings: SettingsStore
     private let vocabulary: VocabularyStore
+    private let decider: (any DecisionModel)?
     private let contextProvider: @MainActor () -> AppContext?
     private let now: @MainActor () -> ContinuousClock.Instant
     private let log = Logger(subsystem: "cc.flykit.uisper", category: "session")
@@ -66,6 +68,7 @@ public final class DictationSession {
         audio: AudioSource,
         settings: SettingsStore,
         vocabulary: VocabularyStore,
+        decider: (any DecisionModel)? = nil,
         contextProvider: @escaping @MainActor () -> AppContext? = { nil },
         now: @escaping @MainActor () -> ContinuousClock.Instant = { .now }
     ) {
@@ -75,6 +78,7 @@ public final class DictationSession {
         self.audio = audio
         self.settings = settings
         self.vocabulary = vocabulary
+        self.decider = decider
         self.contextProvider = contextProvider
         self.now = now
     }
@@ -186,6 +190,7 @@ public final class DictationSession {
         state = .polishing(text: accumulator.full)
         let locale = settings.locale
         let cleanupOn = settings.cleanupEnabled
+        let wordPickOn = settings.wordPickEnabled
         let languageID = settings.languageID
         Task { [weak self] in
             guard let self else { return }
@@ -214,6 +219,11 @@ public final class DictationSession {
                 // The engine hears "flykit" as two words and the cleanup model will not rejoin it,
                 // so do it here, with or without cleanup, where the answer is the user's own spelling.
                 text = VocabularySpelling.apply(words, to: text)
+                if wordPickOn, let decider, Self.isEnglish(text, languageID: languageID) {
+                    let started = ContinuousClock.now
+                    text = await WordPick.apply(text, vocabulary: words, model: decider)
+                    log.info("word pick took \(ContinuousClock.now - started, privacy: .public)")
+                }
                 // Trailing space: dictation usually ends in punctuation, and the next words continue after a space.
                 let inserted = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 let result = await inserter.insert(inserted + " ")
@@ -236,6 +246,11 @@ public final class DictationSession {
                 fail(error.localizedDescription)
             }
         }
+    }
+
+    /// Both must agree: the setting is only a hint to Parakeet, so German speech can arrive under en-US.
+    static func isEnglish(_ text: String, languageID: String) -> Bool {
+        languageID.hasPrefix("en") && NLLanguageRecognizer.dominantLanguage(for: text) == .english
     }
 
     /// Adds words the user fixed by hand after the last dictation to the vocabulary, so the

@@ -25,6 +25,9 @@ public final class SettingsStore {
     /// Writes the raw and cleaned transcript to the system log so dictation quality can be checked.
     /// Off by default: the text is what the user dictated.
     public var debugLogging: Bool { didSet { defaults.set(debugLogging, forKey: "debugLogging") } }
+    /// Asks the local Decider model whether a word close to a vocabulary entry was misheard.
+    /// English only. Off by default: it needs a 2.3 GB model and adds up to 0.5 s.
+    public var wordPickEnabled: Bool { didSet { defaults.set(wordPickEnabled, forKey: "wordPickEnabled") } }
 
     public var languages: [String] { Self.supportedLanguages }
     public var locale: Locale { Locale(identifier: languageID) }
@@ -44,6 +47,7 @@ public final class SettingsStore {
         cleanupEngine = CleanupEngine(rawValue: defaults.string(forKey: "cleanupEngine") ?? "") ?? .builtIn
         launchAtLogin = defaults.bool(forKey: "launchAtLogin")
         debugLogging = defaults.bool(forKey: "debugLogging")
+        wordPickEnabled = defaults.bool(forKey: "wordPickEnabled")
     }
 
     public func cycleLanguage() {

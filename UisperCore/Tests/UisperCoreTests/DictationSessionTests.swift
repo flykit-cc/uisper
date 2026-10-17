@@ -25,6 +25,8 @@ struct DictationSessionTests {
         cleanup: Bool = true,
         mode: ActivationMode = .hold,
         language: String = "de-DE",
+        decider: (any DecisionModel)? = nil,
+        wordPick: Bool = false,
         contextProvider: @escaping @MainActor () -> AppContext? = { nil },
         now: @escaping @MainActor () -> ContinuousClock.Instant = { .now }
     ) -> (DictationSession, FakeSpeechEngine, FakeCleaner, FakeInserter, FakeAudio, SettingsStore, VocabularyStore) {
@@ -33,13 +35,14 @@ struct DictationSessionTests {
         settings.cleanupEnabled = cleanup
         settings.mode = mode
         settings.languageID = language
+        settings.wordPickEnabled = wordPick
         let vocab = VocabularyStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).json"))
         vocab.add("Zephyr")
         let engine = FakeSpeechEngine(script: script)
         let cleaner = FakeCleaner()
         let inserter = FakeInserter()
         let audio = FakeAudio()
-        let session = DictationSession(engines: [.apple: engine], cleaner: cleaner, inserter: inserter, audio: audio, settings: settings, vocabulary: vocab, contextProvider: contextProvider, now: now)
+        let session = DictationSession(engines: [.apple: engine], cleaner: cleaner, inserter: inserter, audio: audio, settings: settings, vocabulary: vocab, decider: decider, contextProvider: contextProvider, now: now)
         return (session, engine, cleaner, inserter, audio, settings, vocab)
     }
 
@@ -189,5 +192,55 @@ struct DictationSessionTests {
     @Test func editsAfterTheWindowAreNotLearned() async {
         let vocab = await learnAfter(.seconds(360))
         #expect(!vocab.words.contains("Sinead"))
+    }
+
+    private func dictate(_ s: DictationSession, _ inserter: FakeInserter) async {
+        s.handle(.pressed)
+        try? await Task.sleep(for: .milliseconds(350))
+        s.handle(.released)
+        _ = await waitUntil { !inserter.inserted.isEmpty }
+    }
+
+    private func wordPickSession(text: String, language: String = "en-US", on: Bool = true,
+                                 decider: FakeDecider) -> (DictationSession, FakeInserter) {
+        let (s, _, _, inserter, _, _, vocab) = makeSession(
+            script: [TranscriptUpdate(text: text, isFinal: true)], cleanup: false, language: language,
+            decider: decider, wordPick: on)
+        vocab.add("Claude Code")
+        return (s, inserter)
+    }
+
+    @Test func wordPickFixesAMisheardName() async {
+        let (s, inserter) = wordPickSession(text: "please open cloud code now", decider: FakeDecider(answers: ["cloud code": [0.01, 0.99]]))
+        await dictate(s, inserter)
+        #expect(inserter.inserted == ["please open Claude Code now "])
+    }
+
+    @Test func wordPickIsOffByDefault() async {
+        let (s, inserter) = wordPickSession(text: "please open cloud code now", on: false, decider: FakeDecider(answers: ["cloud code": [0, 1]]))
+        await dictate(s, inserter)
+        #expect(inserter.inserted == ["please open cloud code now "])
+    }
+
+    @Test func wordPickSkipsGermanText() async {
+        let decider = FakeDecider(answers: ["cloud code": [0, 1]])
+        let (s, inserter) = wordPickSession(text: "bitte öffne cloud code und lies die Datei", language: "de-DE", decider: decider)
+        await dictate(s, inserter)
+        #expect(inserter.inserted == ["bitte öffne cloud code und lies die Datei "])
+        #expect(await decider.questions.isEmpty)
+    }
+
+    @Test func wordPickSkipsGermanSpeechWithTheEnglishSetting() async {
+        // Parakeet treats the language setting as a hint only, so German can arrive under en-US.
+        let decider = FakeDecider(answers: ["cloud code": [0, 1]])
+        let (s, inserter) = wordPickSession(text: "bitte öffne cloud code und lies die Datei jetzt sofort", decider: decider)
+        await dictate(s, inserter)
+        #expect(await decider.questions.isEmpty)
+    }
+
+    @Test func aSlowDeciderStillInserts() async {
+        let (s, inserter) = wordPickSession(text: "please open cloud code now", decider: FakeDecider(answers: ["cloud code": [0, 1]], delay: .seconds(2)))
+        await dictate(s, inserter)
+        #expect(inserter.inserted.count == 1)
     }
 }
