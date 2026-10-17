@@ -55,14 +55,14 @@ actor FakeDecider: DecisionModel {
     var answers: [String: [Double]] = [:]
     var delay: Duration = .zero
     var error: Error?
-    private(set) var questions: [(context: String, question: String, options: [String])] = []
+    private(set) var questions: [(header: String, context: String, question: String, options: [String])] = []
 
     init(answers: [String: [Double]] = [:], delay: Duration = .zero, error: Error? = nil) {
         self.answers = answers; self.delay = delay; self.error = error
     }
 
-    func decide(context: String, question: String, options: [String]) async throws -> [Double] {
-        questions.append((context, question, options))
+    func decide(header: String, context: String, question: String, options: [String]) async throws -> [Double] {
+        questions.append((header, context, question, options))
         if delay > .zero { try await Task.sleep(for: delay) }
         if let error { throw error }
         let phrase = options[0].replacingOccurrences(of: ", as written", with: "")

@@ -6,7 +6,7 @@ struct WordPickTests {
     let vocab = ["Claude Code", "honcho", "Anthropic"]
 
     @Test func replacesASpotOnlyAboveTheThreshold() async {
-        let model = FakeDecider(answers: ["cloud code": [0.02, 0.98], "hancho": [0.10, 0.90]])
+        let model = FakeDecider(answers: ["cloud code": [0.06, 0.94], "hancho": [0.12, 0.88]])
         let out = await WordPick.apply("open cloud code and read hancho logs", vocabulary: vocab, model: model)
         #expect(out == "open Claude Code and read hancho logs")
     }
@@ -21,8 +21,10 @@ struct WordPickTests {
         _ = await WordPick.apply("open cloud code now", vocabulary: vocab, model: model)
         let q = await model.questions
         #expect(q.count == 1)
+        #expect(q[0].header == "This text comes from speech recognition, which sometimes mishears names. "
+                + "Names and terms this speaker often says: Claude Code, honcho, Anthropic\n\n")
         #expect(q[0].context == "open cloud code now")
-        #expect(q[0].question == "In this sentence, what did the speaker mean by 'cloud code'?")
+        #expect(q[0].question == "This text was transcribed from speech. Did the speaker say 'cloud code', or was it a mishearing of one of these?")
         #expect(q[0].options == ["cloud code, as written", "Claude Code"])
     }
 
@@ -39,7 +41,7 @@ struct WordPickTests {
         #expect(out == "ask Anthropic, Claude Code and honcho")
     }
 
-    @Test func asksAtMostFourQuestions() async {
+    @Test func asksAtMostThreeQuestions() async {
         let model = FakeDecider()
         _ = await WordPick.apply("hancho hancho hancho hancho hancho hancho", vocabulary: vocab, model: model)
         #expect(await model.questions.count == WordPick.maxSpots)
