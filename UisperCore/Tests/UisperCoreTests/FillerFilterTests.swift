@@ -21,6 +21,10 @@ struct FillerFilterTests {
     @Test func isCaseInsensitiveAndCleansSpacing() {
         #expect(FillerFilter.apply("Um, hello Hmm world", languageID: "en-GB") == "hello world")
     }
+    // Parakeet writes a spoken "um" as "Mmm" (2026-10-17). Two m's stay: that is millimetres.
+    @Test func removesMmmButKeepsMm() {
+        #expect(FillerFilter.apply("Mmm run the tests on 5 mm", languageID: "en-US") == "run the tests on 5 mm")
+    }
     @Test func unknownLanguageChangesNothing() {
         #expect(FillerFilter.apply("um uh", languageID: "fr-FR") == "um uh")
     }

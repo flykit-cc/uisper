@@ -7,7 +7,7 @@ import Foundation
 /// "at" ("um zehn Uhr"), and "eh" is German for "anyway". "mm" is never listed: it is millimetres.
 public enum FillerFilter {
     static let fillers: [String: Set<String>] = [
-        "en": ["uh", "uhm", "um", "hm", "hmm"],
+        "en": ["uh", "uhm", "um", "hm", "hmm", "mmm"],
         "de": ["äh", "ähm", "öh", "hm"],
         "pt": ["ãh", "hum"],
     ]
