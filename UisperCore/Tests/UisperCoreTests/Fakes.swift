@@ -49,3 +49,23 @@ final class FakeInserter: TextInserting {
         return result
     }
 }
+
+/// Answers each word-pick question from a table keyed by the spot phrase; unknown spots get "leave it".
+actor FakeDecider: DecisionModel {
+    var answers: [String: [Double]] = [:]
+    var delay: Duration = .zero
+    var error: Error?
+    private(set) var questions: [(context: String, question: String, options: [String])] = []
+
+    init(answers: [String: [Double]] = [:], delay: Duration = .zero, error: Error? = nil) {
+        self.answers = answers; self.delay = delay; self.error = error
+    }
+
+    func decide(context: String, question: String, options: [String]) async throws -> [Double] {
+        questions.append((context, question, options))
+        if delay > .zero { try await Task.sleep(for: delay) }
+        if let error { throw error }
+        let phrase = options[0].replacingOccurrences(of: ", as written", with: "")
+        return answers[phrase] ?? [1] + Array(repeating: 0, count: options.count - 1)
+    }
+}
