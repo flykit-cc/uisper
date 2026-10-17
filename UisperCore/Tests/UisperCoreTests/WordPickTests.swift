@@ -28,6 +28,21 @@ struct WordPickTests {
         #expect(q[0].options == ["cloud code, as written", "Claude Code"])
     }
 
+    @Test func asksAllSpotsOfOneContextInOneCall() async {
+        let model = FakeDecider()
+        _ = await WordPick.apply("ask Antropic, cloud code and hancho", vocabulary: vocab, model: model)
+        #expect(await model.calls == 1)
+        #expect(await model.questions.count == 3)
+    }
+
+    @Test func longTextAsksOncePerSentence() async {
+        let filler = Array(repeating: "This sentence is only here to make the text long.", count: 12).joined(separator: " ")
+        let model = FakeDecider()
+        _ = await WordPick.apply("Open cloud code now. " + filler + " Then read hancho logs.", vocabulary: vocab, model: model)
+        #expect(await model.calls == 2)
+        #expect(await model.questions.map(\.context) == ["Open cloud code now.", "Then read hancho logs."])
+    }
+
     @Test func longTextUsesOnlyTheSpotsSentence() async {
         let filler = Array(repeating: "This sentence is only here to make the text long.", count: 12).joined(separator: " ")
         let model = FakeDecider()
@@ -47,12 +62,11 @@ struct WordPickTests {
         #expect(await model.questions.count == WordPick.maxSpots)
     }
 
-    @Test func stopsAskingOnceTheBudgetIsSpent() async {
-        let model = FakeDecider(answers: ["hancho": [0, 1]], delay: .milliseconds(300))
+    @Test func overBudgetLeavesTheTextAloneAndReturnsInTime() async {
+        let model = FakeDecider(answers: ["hancho": [0, 1]], delay: .seconds(2))
         let started = ContinuousClock.now
-        let out = await WordPick.apply("hancho and hancho and hancho", vocabulary: vocab, model: model)
-        #expect(await model.questions.count == 2)          // 0 ms and 300 ms start; 600 ms does not
-        #expect(out == "honcho and honcho and hancho")
+        let out = await WordPick.apply("hancho and hancho", vocabulary: vocab, model: model)
+        #expect(out == "hancho and hancho")
         #expect(ContinuousClock.now - started < .milliseconds(800))
     }
 

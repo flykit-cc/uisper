@@ -1,11 +1,12 @@
 import Foundation
 import NaturalLanguage
 
-/// A model that answers a multiple-choice question about a text with one probability per option.
+/// A model that answers multiple-choice questions about one text, with one probability per option.
 /// Option A (index 0) is always "leave it as it is". The prompt's context is `header + context`;
 /// they are separate so a model can keep its state after the header, which changes only with the vocabulary.
+/// All questions share the context, so a model can answer them in one pass.
 public protocol DecisionModel: Sendable {
-    func decide(header: String, context: String, question: String, options: [String]) async throws -> [Double]
+    func decide(header: String, context: String, questions: [(question: String, options: [String])]) async throws -> [[Double]]
 }
 
 /// Fixes misheard vocabulary words: for each spot the finder raises, asks the model whether the
@@ -21,23 +22,45 @@ public enum WordPick {
     /// Above this the whole text as context costs more than the budget allows (spike: 211 words, 4 spots, 0.63 s).
     static let wholeTextWords = 100
 
-    public static func apply(_ text: String, vocabulary: [String], model: any DecisionModel,
-                             now: @Sendable () -> ContinuousClock.Instant = { .now }) async -> String {
-        let started = now()
+    /// Never takes longer than `budget`: past it the text goes out unchanged and the model's
+    /// answer, when it comes, is dropped.
+    public static func apply(_ text: String, vocabulary: [String], model: any DecisionModel) async -> String {
+        let spots = Array(SpotFinder.spots(in: text, vocabulary: vocabulary).prefix(maxSpots))
+        guard !spots.isEmpty else { return text }
+        // Not a task group: it waits for every child, and a model pass already running cannot be cancelled.
+        let (first, done) = AsyncStream.makeStream(of: String.self)
+        let work = Task {
+            done.yield(await pick(spots, in: text, header: header(vocabulary), model: model))
+            done.finish()
+        }
+        let timer = Task {
+            try? await Task.sleep(for: budget)
+            done.finish()
+        }
+        defer { work.cancel(); timer.cancel() }
+        for await out in first { return out }
+        return text
+    }
+
+    static func pick(_ spots: [Spot], in text: String, header: String, model: any DecisionModel) async -> String {
+        var groups: [(context: String, spots: [Spot])] = []
+        for spot in spots {
+            let c = context(for: spot, in: text)
+            if let i = groups.firstIndex(where: { $0.context == c }) { groups[i].spots.append(spot) } else { groups.append((c, [spot])) }
+        }
         var edits: [(Range<String.Index>, String)] = []
-        for spot in SpotFinder.spots(in: text, vocabulary: vocabulary).prefix(maxSpots) {
-            // ponytail: checked between questions, so one slow answer can overrun by its own length (~90 ms).
-            guard now() - started < budget else { break }
-            let options = ["\(spot.phrase), as written"] + spot.candidates
-            guard let p = try? await model.decide(
-                    header: header(vocabulary),
-                    context: context(for: spot, in: text),
-                    question: "This text was transcribed from speech. Did the speaker say '\(spot.phrase)', or was it a mishearing of one of these?",
-                    options: options),
-                  p.count == options.count,
-                  let best = p.indices.max(by: { p[$0] < p[$1] }), best > 0, p[best] >= threshold
-            else { continue }
-            edits.append((spot.range, spot.candidates[best - 1]))
+        for group in groups {
+            let questions = group.spots.map { spot in
+                (question: "This text was transcribed from speech. Did the speaker say '\(spot.phrase)', or was it a mishearing of one of these?",
+                 options: ["\(spot.phrase), as written"] + spot.candidates)
+            }
+            guard let answers = try? await model.decide(header: header, context: group.context, questions: questions),
+                  answers.count == questions.count else { continue }
+            for (spot, p) in zip(group.spots, answers) {
+                guard p.count == spot.candidates.count + 1,
+                      let best = p.indices.max(by: { p[$0] < p[$1] }), best > 0, p[best] >= threshold else { continue }
+                edits.append((spot.range, spot.candidates[best - 1]))
+            }
         }
         var out = text
         // From the end, so earlier ranges stay valid.
@@ -47,7 +70,7 @@ public enum WordPick {
         return out
     }
 
-    static func header(_ vocabulary: [String]) -> String {
+    public static func header(_ vocabulary: [String]) -> String {
         "This text comes from speech recognition, which sometimes mishears names. Names and terms this speaker often says: "
             + vocabulary.joined(separator: ", ") + "\n\n"
     }
