@@ -151,11 +151,6 @@ final class AppModel {
         }
     }
 
-    var wordPickNotice: String? {
-        guard settings.wordPickEnabled, !MLXDecider.isInstalled(MLXDecider.defaultDirectory()) else { return nil }
-        return "The Decider model is not installed. Words are inserted without this check."
-    }
-
     /// Fetches and loads the speech model ahead of the first dictation, so the hotkey does not
     /// sit on a download: 600 MB for Parakeet, the locale assets for Apple. Both are no-ops once
     /// installed, so this is cheap to call on every engine or language change.

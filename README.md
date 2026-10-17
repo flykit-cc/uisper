@@ -119,3 +119,8 @@ To publish a release: `scripts/release.sh <version>`.
 ## License
 
 MIT.
+
+## Credits
+
+- The list of common English words that uisper never learns comes from [wordfreq](https://github.com/rspeer/wordfreq) by Robyn Speer, licensed CC BY-SA 4.0.
+- The optional name check uses [Decider](https://huggingface.co/Mapika/decider-4b) by Mapika, licensed Apache 2.0.

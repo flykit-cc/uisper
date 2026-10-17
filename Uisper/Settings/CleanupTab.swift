@@ -22,10 +22,10 @@ struct CleanupTab: View {
                         if case .failed = model.modelDownload.state { Button("Retry") { model.ensureModel() } }
                     }
                 }
-                Toggle("Fix misheard names with the Decider (English)", isOn: Bindable(model.settings).wordPickEnabled)
-                    .onChange(of: model.settings.wordPickEnabled) { model.ensureDecider() }
-                if let notice = model.wordPickNotice {
-                    Text(notice).font(.callout).foregroundStyle(.secondary)
+                // ponytail: shown only where the model was installed by hand, until the app downloads it itself.
+                if MLXDecider.isInstalled(MLXDecider.defaultDirectory()) {
+                    Toggle("Fix misheard names with the Decider (English)", isOn: Bindable(model.settings).wordPickEnabled)
+                        .onChange(of: model.settings.wordPickEnabled) { model.ensureDecider() }
                 }
             }
             Section {
