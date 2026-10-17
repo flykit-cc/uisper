@@ -62,9 +62,9 @@ actor FakeDecider: DecisionModel {
         self.answers = answers; self.delay = delay; self.error = error
     }
 
-    func decide(header: String, context: String, questions asked: [(question: String, options: [String])]) async throws -> [[Double]] {
+    func decide(header: String, questions asked: [(context: String, question: String, options: [String])]) async throws -> [[Double]] {
         calls += 1
-        questions += asked.map { (header, context, $0.question, $0.options) }
+        questions += asked.map { (header, $0.context, $0.question, $0.options) }
         if delay > .zero { try await Task.sleep(for: delay) }
         if let error { throw error }
         return asked.map { q in

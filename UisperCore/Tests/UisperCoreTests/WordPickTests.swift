@@ -30,18 +30,18 @@ struct WordPickTests {
         #expect(q[0].options == ["cloud code, as written", "Claude Code"])
     }
 
-    @Test func asksAllSpotsOfOneContextInOneCall() async {
+    @Test func asksAllSpotsInOneCall() async {
         let model = FakeDecider()
         _ = await WordPick.apply("ask Antropic, cloud code and hancho", vocabulary: vocab, model: model).text
         #expect(await model.calls == 1)
         #expect(await model.questions.count == 3)
     }
 
-    @Test func longTextAsksOncePerSentence() async {
+    @Test func longTextAsksEachSpotWithItsOwnSentenceInOneCall() async {
         let filler = Array(repeating: "This sentence is only here to make the text long.", count: 12).joined(separator: " ")
         let model = FakeDecider()
         _ = await WordPick.apply("Open cloud code now. " + filler + " Then read hancho logs.", vocabulary: vocab, model: model).text
-        #expect(await model.calls == 2)
+        #expect(await model.calls == 1)
         #expect(await model.questions.map(\.context) == ["Open cloud code now.", "Then read hancho logs."])
     }
 

@@ -1,12 +1,12 @@
 import Foundation
 import NaturalLanguage
 
-/// A model that answers multiple-choice questions about one text, with one probability per option.
-/// Option A (index 0) is always "leave it as it is". The prompt's context is `header + context`;
-/// they are separate so a model can keep its state after the header, which changes only with the vocabulary.
-/// All questions share the context, so a model can answer them in one pass.
+/// A model that answers multiple-choice questions, with one probability per option per question.
+/// Option A (index 0) is always "leave it as it is". Each question's prompt context is `header + context`;
+/// they are separate so a model can keep its state after the header, which changes only with the vocabulary,
+/// and answer all questions in one pass.
 public protocol DecisionModel: Sendable {
-    func decide(header: String, context: String, questions: [(question: String, options: [String])]) async throws -> [[Double]]
+    func decide(header: String, questions: [(context: String, question: String, options: [String])]) async throws -> [[Double]]
 }
 
 /// Fixes misheard vocabulary words: for each spot the finder raises, asks the model whether the
@@ -53,20 +53,14 @@ public enum WordPick {
     }
 
     static func pick(_ spots: [Spot], in text: String, header: String, model: any DecisionModel) async -> Outcome {
-        var groups: [(context: String, spots: [Spot])] = []
-        for spot in spots {
-            let c = context(for: spot, in: text)
-            if let i = groups.firstIndex(where: { $0.context == c }) { groups[i].spots.append(spot) } else { groups.append((c, [spot])) }
+        let questions = spots.map { spot in
+            (context: context(for: spot, in: text),
+             question: "This text was transcribed from speech. Did the speaker say '\(spot.phrase)', or was it a mishearing of one of these?",
+             options: ["\(spot.phrase), as written"] + spot.candidates)
         }
         var edits: [(spot: Spot, word: String, p: Double)] = []
-        for group in groups {
-            let questions = group.spots.map { spot in
-                (question: "This text was transcribed from speech. Did the speaker say '\(spot.phrase)', or was it a mishearing of one of these?",
-                 options: ["\(spot.phrase), as written"] + spot.candidates)
-            }
-            guard let answers = try? await model.decide(header: header, context: group.context, questions: questions),
-                  answers.count == questions.count else { continue }
-            for (spot, p) in zip(group.spots, answers) {
+        if let answers = try? await model.decide(header: header, questions: questions), answers.count == spots.count {
+            for (spot, p) in zip(spots, answers) {
                 guard p.count == spot.candidates.count + 1,
                       let best = p.indices.max(by: { p[$0] < p[$1] }), best > 0, p[best] >= threshold else { continue }
                 edits.append((spot, spot.candidates[best - 1], p[best]))
