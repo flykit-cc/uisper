@@ -39,7 +39,7 @@ actor MLXCleaner: TranscriptCleaner {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
         // Throwing makes the session insert the raw text; blocking on a 2 GB download would not.
-        guard ModelDownload.isComplete(directory) else { throw NotDownloaded() }
+        guard ModelDownload.qwen.isComplete(in: directory) else { throw NotDownloaded() }
         let model = try await container()
         var pieces: [String] = []
         let instructions = CleanupPrompt.instructions(locale: locale, vocabulary: vocabulary, context: context)

@@ -14,6 +14,7 @@ final class AppModel {
     let session: DictationSession
     private(set) var hotkeyError: String?
     let modelDownload: ModelDownload
+    let deciderDownload = ModelDownload.decider()
     let speechDownload = SpeechModelDownload()
     /// Why the Apple engine cannot run, or nil when it can.
     private let appleNotice: String?
@@ -30,12 +31,26 @@ final class AppModel {
         switch settings.cleanupEngine {
         case .apple: return appleNotice
         case .builtIn:
+            let size = modelDownload.source.sizeLabel
             switch modelDownload.state {
-            case .ready: return nil
-            case .missing: return "The built-in model (\(ModelDownload.sizeLabel)) is not downloaded yet."
-            case .downloading(let f): return "Downloading the built-in model (\(ModelDownload.sizeLabel))… \(Int(f * 100))%. Text is inserted without cleanup until it is done."
+            case .ready, .converting: return nil  // this model is published ready to load
+            case .missing: return "The built-in model (\(size)) is not downloaded yet."
+            case .downloading(let f): return "Downloading the built-in model (\(size))… \(Int(f * 100))%. Text is inserted without cleanup until it is done."
             case .failed(let e): return "Model download failed: \(e)"
             }
+        }
+    }
+
+    /// One line for the Settings pane about the Decider model, or nil when it is ready or word pick is off.
+    var wordPickNotice: String? {
+        guard settings.wordPickEnabled else { return nil }
+        let size = deciderDownload.source.sizeLabel
+        switch deciderDownload.state {
+        case .ready: return nil
+        case .missing: return "The Decider model (\(size)) is not downloaded yet."
+        case .downloading(let f): return "Downloading the Decider model (\(size))… \(Int(f * 100))%. Words are inserted without this check until it is done."
+        case .converting: return "Shrinking the Decider model to 4-bit for this Mac. This takes a few minutes and only happens once."
+        case .failed(let e): return "Decider download failed: \(e)"
         }
     }
 
@@ -136,11 +151,13 @@ final class AppModel {
         }
     }
 
-    /// Loads the Decider ahead of the first dictation when word pick is on. Cheap to call often.
+    /// Downloads the Decider when word pick is on and loads it ahead of the first dictation. Cheap to call often.
     func ensureDecider() {
-        guard settings.wordPickEnabled, MLXDecider.isInstalled(MLXDecider.defaultDirectory()) else { return }
-        let header = WordPick.header(vocabulary.words)
-        Task { [decider] in await decider.prewarm(header: header) }
+        guard settings.wordPickEnabled else { return }
+        Task {
+            do { try await deciderDownload.ensure() } catch { return }
+            await decider.prewarm(header: WordPick.header(vocabulary.words))
+        }
     }
 
     /// The Decider keeps its state after the vocabulary line; re-read it whenever the vocabulary changes
