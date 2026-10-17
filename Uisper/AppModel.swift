@@ -18,6 +18,7 @@ final class AppModel {
     /// Why the Apple engine cannot run, or nil when it can.
     private let appleNotice: String?
     private var mlx: MLXCleaner?
+    private let decider: MLXDecider
 
     /// One line for the Settings pane about the speech model, or nil when there is nothing to say.
     var speechNotice: String? {
@@ -60,9 +61,10 @@ final class AppModel {
             engines[.apple] = FoundationModelsCleaner()
         }
         let cleaner = CleanupRouter(settings: settings, engines: engines)
+        let decider = MLXDecider()
         let session = DictationSession(
             engines: speechEngines, cleaner: cleaner, inserter: inserter, audio: AudioCapture(),
-            settings: settings, vocabulary: vocabulary,
+            settings: settings, vocabulary: vocabulary, decider: decider,
             contextProvider: { WindowContextReader().read() }
         )
         self.settings = settings
@@ -72,8 +74,11 @@ final class AppModel {
         self.appleNotice = appleNotice
         self.modelDownload = modelDownload
         self.mlx = mlx
+        self.decider = decider
         self.overlay = OverlayController(session: session, anchor: { inserter.focusedWindowFrame() })
         ensureModel()
+        ensureDecider()
+        watchVocabulary()
         ensureSpeechModel()
         startHotkey()
         let granted = Permissions.allGranted
@@ -129,6 +134,26 @@ final class AppModel {
             do { try await modelDownload.ensure() } catch { return }
             await mlx.prewarm()
         }
+    }
+
+    /// Loads the Decider ahead of the first dictation when word pick is on. Cheap to call often.
+    func ensureDecider() {
+        guard settings.wordPickEnabled, MLXDecider.isInstalled(MLXDecider.defaultDirectory()) else { return }
+        let header = WordPick.header(vocabulary.words)
+        Task { [decider] in await decider.prewarm(header: header) }
+    }
+
+    /// The Decider keeps its state after the vocabulary line; re-read it whenever the vocabulary changes
+    /// (typed in Settings or learned from an edit), so the next dictation does not pay ~200 ms for it.
+    private func watchVocabulary() {
+        withObservationTracking { _ = vocabulary.words } onChange: { [weak self] in
+            Task { @MainActor in self?.ensureDecider(); self?.watchVocabulary() }
+        }
+    }
+
+    var wordPickNotice: String? {
+        guard settings.wordPickEnabled, !MLXDecider.isInstalled(MLXDecider.defaultDirectory()) else { return nil }
+        return "The Decider model is not installed. Words are inserted without this check."
     }
 
     /// Fetches and loads the speech model ahead of the first dictation, so the hotkey does not
