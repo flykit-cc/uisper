@@ -221,8 +221,15 @@ public final class DictationSession {
                 text = VocabularySpelling.apply(words, to: text)
                 if wordPickOn, let decider, Self.isEnglish(text, languageID: languageID) {
                     let started = ContinuousClock.now
-                    text = await WordPick.apply(text, vocabulary: words, model: decider)
-                    log.info("word pick took \(ContinuousClock.now - started, privacy: .public)")
+                    let picked = await WordPick.apply(text, vocabulary: words, model: decider)
+                    text = picked.text
+                    // notice, not info: macOS keeps only notice and above on disk.
+                    log.notice("word pick took \(ContinuousClock.now - started, privacy: .public), \(picked.asked) spot(s)\(picked.timedOut ? ", timed out" : "", privacy: .public)")
+                    if settings.debugLogging {
+                        for c in picked.changes {
+                            log.notice("word pick: '\(c.spot, privacy: .public)' -> '\(c.word, privacy: .public)' p=\(c.p, format: .fixed(precision: 2))")
+                        }
+                    }
                 }
                 // Trailing space: dictation usually ends in punctuation, and the next words continue after a space.
                 let inserted = text.trimmingCharacters(in: .whitespacesAndNewlines)
