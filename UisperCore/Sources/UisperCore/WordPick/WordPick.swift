@@ -34,7 +34,8 @@ public enum WordPick {
             done.finish()
         }
         let timer = Task {
-            try? await Task.sleep(for: budget)
+            // Without a tolerance the system may wake this ~10% late.
+            try? await Task.sleep(for: budget, tolerance: .milliseconds(1))
             done.finish()
         }
         defer { work.cancel(); timer.cancel() }
