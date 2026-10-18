@@ -48,15 +48,30 @@ A small AI model rewrites the raw transcript before it is inserted:
 - Drops fillers like "uh" and "um" and false starts.
 - Applies self-corrections: "send it Monday, no wait, Tuesday" becomes "send it Tuesday".
 - Repairs words the speech engine misheard, when the context makes the right one obvious.
-- Spells the words in your vocabulary list the way you told it to, even when they arrive split or misheard: "clot code" becomes "Claude Code".
 
 It runs on your Mac. Turn it off in the menu bar when you want the raw words.
+
+Some fixes happen with the cleanup on or off:
+
+- Sounds that are never words ("uh", "um", "hmm" in English, "äh" in German, "ãh" in Portuguese) are removed.
+- Your vocabulary words keep your spelling. "claude code" becomes "Claude Code", and a word heard in two parts is joined again: "fly kit" becomes "flykit".
+
+## Fix misheard names (optional, English)
+
+The speech engine sometimes hears a name as ordinary words: "cloud code" instead of "Claude Code", "Antropic" instead of "Anthropic". Turn on **Settings › Cleanup › Fix misheard names with the Decider** to catch these.
+
+uisper then looks for words that are spelled close to a word in your vocabulary list. For each one, it asks a small local model, [Decider](https://huggingface.co/Mapika/decider-4b), whether you meant your word. It changes the text only when the model is very sure, so "a quant fund" stays as it is even if "Quants" is in your list.
+
+- The first time you turn it on, uisper downloads the model from its author's Hugging Face page (about 8.4 GB) and makes a smaller copy for your Mac (about 2.4 GB). The large download is deleted afterwards. Settings shows the progress. Dictation works meanwhile, without this check.
+- It adds at most half a second to a dictation. If it takes longer, the text is inserted without it.
+- English only. It is skipped when the dictation language or the text is not English.
+- Converting the model needs about 8 GB of free memory once.
 
 ## The vocabulary learns
 
 Add names and terms in Settings › Vocabulary, and uisper will spell them your way.
 
-It also picks them up on its own. Correct a word by hand after dictating, and the next time you dictate in that app uisper notices the change and remembers your spelling. It only learns words that look like names, so ordinary edits like "call" to "called" are ignored.
+It also picks them up on its own. Correct a word by hand within five minutes of dictating, and the next time you dictate in that app uisper notices the change and remembers your spelling. It skips the 5,000 most common English words and sentences you rewrote, so ordinary edits like "call" to "called" are ignored. Learned words are capped at 200; the oldest go first. Words you typed in yourself are never removed.
 
 Reading what you corrected needs the app to expose its text. Native apps do. Chrome and Electron apps do once uisper asks them to. Ghostty does through its own screen keybind. Other terminals cannot, so learning is off there — dictation itself still works everywhere.
 
@@ -67,6 +82,7 @@ Reading what you corrected needs the app to expose its text. Native apps do. Chr
 - English, German, Brazilian Portuguese. Switch from the menu bar.
 - Two speech engines: the built-in one, or Apple's. Switch in Settings › General.
 - Personal vocabulary list that grows from your own corrections.
+- Optional check that fixes misheard names from your list (English).
 - Password fields are respected: when secure input is on, the text goes to the clipboard instead.
 - Works in every app, including Chrome and Electron apps, through a paste fallback.
 
@@ -78,6 +94,7 @@ Everything runs on device inside macOS 26:
 |---|---|
 | Speech to text | Parakeet TDT v3 on the Neural Engine, via [FluidAudio](https://github.com/FluidInference/FluidAudio). Apple `SpeechAnalyzer` is the alternative and streams words as you talk |
 | Cleanup | Qwen3 4B on [MLX](https://github.com/ml-explore/mlx-swift-lm). Apple Foundation Models is the alternative |
+| Misheard names (optional) | Decider 4B v2 on MLX, answering one multiple-choice question per suspect word |
 | Text insertion | Accessibility API, with a paste fallback |
 | Hotkey | A global event tap, so hold-to-talk works everywhere |
 

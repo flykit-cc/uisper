@@ -19,5 +19,7 @@ Native, fully local dictation for macOS 26 on Apple silicon.
 
 **First run** downloads two models it then keeps: about 600 MB for speech and about 2.1 GB for the cleanup. Settings > General shows the progress. Dictation works meanwhile, without the cleanup.
 
+**Optional:** Settings > Cleanup > "Fix misheard names with the Decider" (English) downloads one more model the first time you turn it on: about 8.4 GB, kept as a 2.4 GB copy.
+
 Apple Intelligence is optional. uisper ships its own models; Apple's are selectable in Settings if you prefer them.
 NOTES
